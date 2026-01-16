@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Inventarios Inteligente</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- jsPDF for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom scrollbar for dashboard look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+        
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+        /* Table Inputs Reset */
+        .table-input {
+            background: transparent;
+            width: 100%;
+            height: 100%;
+            border: none;
+            outline: none;
+            padding: 4px;
+            font-family: inherit;
+            color: inherit;
+        }
+        .table-input:focus {
+            background: rgba(255, 255, 255, 0.5);
+            box-shadow: inset 0 0 0 2px #3b82f6;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 font-sans h-screen overflow-hidden">
+<div id="app" class="flex h-full">
+    <!-- SIDEBAR -->
+    <aside class="w-16 md:w-64 bg-slate-950 border-r border-slate-800 flex flex-col transition-all duration-300 z-20">
+        <div class="p-4 flex items-center justify-center md:justify-start gap-3 border-b border-slate-800 h-16">
+            <i class="fa-solid fa-cube text-emerald-500 text-2xl"></i>
+            <span class="font-bold text-xl hidden md:block tracking-wide">Inventario<span class="text-emerald-500">AI</span></span>
+        </div>
+        <nav class="flex-1 p-2 space-y-2 mt-4">
+            <button @click="currentView = 'dashboard'" :class="{'bg-emerald-500/10 text-emerald-400': currentView === 'dashboard'}" class="w-full p-3 rounded-lg flex items-center gap-3 hover:bg-slate-800 transition-colors text-slate-400 hover:text-white">
+                <i class="fa-solid fa-chart-line w-6 text-center"></i>
+                <span class="hidden md:block">Dashboard</span>
+            </button>
+            <button @click="exportToExcel" class="w-full p-3 rounded-lg flex items-center gap-3 hover:bg-slate-800 transition-colors text-slate-400 hover:text-white">
+                <i class="fa-solid fa-file-excel w-6 text-center"></i>
+                <span class="hidden md:block">Exportar Excel</span>
+            </button>
+            <button @click="exportToPDF" class="w-full p-3 rounded-lg flex items-center gap-3 hover:bg-slate-800 transition-colors text-slate-400 hover:text-white">
+                <i class="fa-solid fa-file-pdf w-6 text-center"></i>
+                <span class="hidden md:block">Exportar PDF</span>
+            </button>
+        </nav>
+        <!-- AI ASSISTANT TOGGLE -->
+        <div class="p-4 border-t border-slate-800">
+             <button @click="toggleAssistant" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white p-3 rounded-lg shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all">
+                <i class="fa-solid fa-robot"></i>
+                <span class="hidden md:block">Asistente IA</span>
+             </button>
+        </div>
+    </aside>
+    <!-- MIAN CONTENT -->
+    <main class="flex-1 flex flex-col min-w-0 bg-slate-900 relative">
+        <!-- HEADER -->
+        <header class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6">
+            <div class="flex items-center gap-4">
+                <h1 class="text-xl font-semibold text-slate-100">Panel de Control</h1>
+                <span class="bg-slate-800 text-xs px-2 py-1 rounded text-slate-400">v1.2.0</span>
+            </div>
+            <div class="flex gap-4 items-center">
+                 <div class="text-right hidden sm:block">
+                    <p class="text-sm text-slate-400">{{ currentDate }}</p>
+                    <p class="text-xs text-slate-600 font-mono">Saldo Global: <span class="text-emerald-400 font-bold">{{ formatCurrency(globalCostBalance) }}</span></p>
+                 </div>
+            </div>
+        </header>
+        <!-- CONTENT SCROLL AREA -->
+        <div class="flex-1 overflow-auto p-6 space-y-6">
+            <!-- NLP INPUT AREA -->
+            <div class="bg-slate-800/50 rounded-xl border border-slate-700 p-6 shadow-xl relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <i class="fa-solid fa-wand-magic-sparkles text-6xl text-emerald-500"></i>
+                </div>
+                <h2 class="text-lg font-medium text-emerald-400 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-bolt"></i> Ingreso Rápido Inteligente
+                </h2>
+                <p class="text-slate-400 text-sm mb-4">Escribe en lenguaje natural. Ej: "Hoy entraron 50kg de Tomate Lote-A1 a 8bs del Mercado"</p>
+                <div class="flex gap-2">
+                    <textarea 
+                        v-model="nlpInput" 
+                        @keydown.enter.prevent="processNLP"
+                        placeholder="Describe el movimiento aquí..." 
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg p-4 text-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all resize-none font-mono text-lg"
+                        rows="2"
+                    ></textarea>
+                    <button @click="processNLP" class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 rounded-lg font-medium transition-colors shadow-lg shadow-emerald-500/20">
+                        Procesar
+                    </button>
+                </div>
+            </div>
+            <!-- MAIN DATA TABLE -->
+            <div class="bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col h-[600px] border border-slate-700">
+                <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                    <h3 class="text-gray-700 font-bold text-lg"><i class="fa-solid fa-table-list mr-2"></i>Registros de Inventario</h3>
+                    <div class="flex gap-2">
+                         <input v-model="searchQuery" type="text" placeholder="Buscar..." class="bg-white border text-gray-700 border-gray-300 rounded px-3 py-1 text-sm outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+                
+                <div class="overflow-auto flex-1">
+                    <table id="inventory-table" class="w-full text-left border-collapse">
+                        <thead class="bg-gray-100 text-gray-600 font-semibold text-sm sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th class="p-4 whitespace-nowrap border-b w-32">Fecha</th>
+                                <th class="p-4 whitespace-nowrap border-b min-w-[200px]">Descripción</th>
+                                <th class="p-4 whitespace-nowrap border-b">Lote Int/Ext</th>
+                                <th class="p-4 whitespace-nowrap border-b text-right">Cantidad</th>
+                                <th class="p-4 whitespace-nowrap border-b">Unidad</th>
+                                <th class="p-4 whitespace-nowrap border-b">Movimiento</th>
+                                <th class="p-4 whitespace-nowrap border-b text-right bg-gray-200/50 font-bold">Saldo Qty</th>
+                                <th class="p-4 whitespace-nowrap border-b">Origen/Destino</th>
+                                <th class="p-4 whitespace-nowrap border-b text-right">Costo U.</th>
+                                <th class="p-4 whitespace-nowrap border-b text-right">Costo Total</th>
+                                <th class="p-4 whitespace-nowrap border-b text-right bg-gray-200/50 font-bold">Saldo Costo</th>
+                                <th class="p-4 whitespace-nowrap border-b min-w-[150px]">Observaciones</th>
+                                <th class="p-4 whitespace-nowrap border-b w-10"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-700 text-sm">
+                            <tr v-for="(row, index) in filteredInventory" :key="row.id" 
+                                :class="{
+                                    'bg-green-50 hover:bg-green-100': row.movement === 'Entrada' || row.movement === 'Inv. Inicial',
+                                    'bg-red-50 hover:bg-red-100': row.movement === 'Salida',
+                                    'bg-yellow-50 hover:bg-yellow-100': row.movement === 'Ajuste'
+                                }"
+                                class="border-b last:border-0 transition-colors group">
+                                
+                                <!-- Edit: Date -->
+                                <td class="p-0 border-r border-gray-100"><input type="date" v-model="row.date" class="table-input text-gray-500 text-xs"></td>
+                                
+                                <!-- Edit: Desc -->
+                                <td class="p-0 border-r border-gray-100"><input type="text" v-model="row.description" class="table-input font-medium"></td>
+                                
+                                <!-- Edit: Batch -->
+                                <td class="p-0 border-r border-gray-100"><input type="text" v-model="row.batch" class="table-input text-gray-500"></td>
+                                
+                                <!-- Edit: Qty (Triggers reactivity) -->
+                                <td class="p-0 border-r border-gray-100"><input type="number" v-model.number="row.quantity" class="table-input text-right font-mono text-base"></td>
+                                
+                                <!-- Edit: Unit -->
+                                <td class="p-0 border-r border-gray-100"><input type="text" v-model="row.unit" class="table-input w-16 text-center text-xs uppercase text-gray-400"></td>
+                                
+                                <!-- Edit: Movement -->
+                                <td class="p-0 border-r border-gray-100">
+                                    <select v-model="row.movement" class="table-input bg-transparent cursor-pointer">
+                                        <option value="Inv. Inicial">Inv. Inicial</option>
+                                        <option value="Entrada">Entrada</option>
+                                        <option value="Salida">Salida</option>
+                                    </select>
+                                </td>
+                                
+                                <!-- Calculated: Saldo -->
+                                <td class="p-3 text-right font-bold font-mono border-r border-gray-100 text-gray-800 bg-black/5">{{ row.computedBalance }}</td>
+                                
+                                <!-- Edit: Origin/Dest -->
+                                <td class="p-0 border-r border-gray-100"><input type="text" v-model="row.originDestiny" class="table-input"></td>
+                                
+                                <!-- Edit: Unit Cost -->
+                                <td class="p-0 border-r border-gray-100"><input type="number" v-model.number="row.unitCost" step="0.01" class="table-input text-right font-mono"></td>
+                                
+                                <!-- Calculated: Total Cost -->
+                                <td class="p-3 text-right font-mono border-r border-gray-100">{{ formatCurrency(row.quantity * row.unitCost) }}</td>
+                                
+                                <!-- Calculated: Cost Balance -->
+                                <td class="p-3 text-right font-bold font-mono border-r border-gray-100 text-gray-800 bg-black/5">{{ formatCurrency(row.computedCostBalance) }}</td>
+                                
+                                <!-- Edit: Obs -->
+                                <td class="p-0 border-r border-gray-100"><input type="text" v-model="row.observations" class="table-input italic text-gray-500"></td>
+                                <!-- Action -->
+                                <td class="p-2 text-center text-gray-400 hover:text-red-500 cursor-pointer" @click="removeRow(row.id)">
+                                    <i class="fa-solid fa-trash"></i>
+                                </td>
+                            </tr>
+                            <tr v-if="inventory.length === 0">
+                                <td colspan="13" class="p-12 text-center text-gray-400">
+                                    <i class="fa-solid fa-scroll text-4xl mb-3 block opacity-20"></i>
+                                    No hay registros aún. Usa el "Ingreso Rápido" arriba.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+    </main>
+    <!-- AI ASSISTANT PANEL -->
+    <div class="fixed inset-y-0 right-0 w-80 bg-slate-800 border-l border-slate-700 shadow-2xl transform transition-transform duration-300 z-50 flex flex-col"
+         :class="assistantOpen ? 'translate-x-0' : 'translate-x-full'">
+         
+         <div class="p-4 bg-slate-900 border-b border-slate-700 flex justify-between items-center">
+             <h3 class="text-emerald-400 font-bold"><i class="fa-solid fa-robot mr-2"></i>Asistente IA</h3>
+             <button @click="toggleAssistant" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+         </div>
+         <div class="flex-1 p-4 overflow-y-auto space-y-4" id="chat-container">
+             <div class="bg-slate-700/50 p-3 rounded-lg rounded-tl-none text-sm text-slate-300">
+                 Hola! Soy tu asistente de inventario. Puedo ayudarte a filtrar datos o gestionar la tabla. Prueba: "Filtrar tomate" o "Borrar todo".
+             </div>
+             
+             <div v-for="(msg, i) in chatMessages" :key="i" 
+                  :class="msg.role === 'user' ? 'bg-indigo-600 ml-8 rounded-tr-none' : 'bg-slate-700/50 mr-8 rounded-tl-none'"
+                  class="p-3 rounded-lg text-sm text-white break-words animate-fade-in">
+                 {{ msg.text }}
+             </div>
+         </div>
+         <div class="p-4 bg-slate-900 border-t border-slate-700">
+             <div class="relative">
+                 <input type="text" v-model="chatInput" @keydown.enter="sendChat" placeholder="Escribe un comando..." class="w-full bg-slate-800 border border-slate-600 rounded-full px-4 py-2 text-sm text-white focus:border-indigo-500 outline-none pr-10">
+                 <button @click="sendChat" class="absolute right-2 top-1.5 text-indigo-400 hover:text-white"><i class="fa-solid fa-paper-plane"></i></button>
+             </div>
+         </div>
+    </div>
+</div>
+<script>
+    const { createApp, ref, computed, watch, nextTick } = Vue;
+    createApp({
+        setup() {
+            // STATE
+            const inventory = ref([
+                // Sample initial data
+                { id: 1, date: new Date().toISOString().split('T')[0], description: "Inventario Inicial Tomate", batch: "INT-001", quantity: 100, movement: "Inv. Inicial", unit: "kg", originDestiny: "Almacén A", unitCost: 5.50, observations: "Carga inicial" }
+            ]);
+            
+            const nlpInput = ref("");
+            const assistantOpen = ref(true); // Open by default
+            const chatInput = ref("");
+            const chatMessages = ref([]);
+            const searchQuery = ref("");
+            const currentView = ref('dashboard');
+            // COMPUTED & LOGIC
+            const currentDate = computed(() => {
+                return new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            });
+            // The Core Logic: Calculating Balances dynamically based on sort order (Date -> ID)
+            // Note: For simplicity in this single-file demo, we assume the array order determines calculation order.
+            // In a production app, you might want to sort by date explicitly before calculating.
+            const computedInventory = computed(() => {
+                let runningQty = 0;
+                let runningCost = 0;
+                // Create a copy to avoid mutating the original refs directly in the loop if we were strictly using props,
+                // but here we are augmenting the objects for display. 
+                // To avoid infinite loops, we return NEW objects with the computed fields.
+                return inventory.value.map(item => {
+                    const isEntry = item.movement === 'Entrada' || item.movement === 'Inv. Inicial';
+                    const isExit = item.movement === 'Salida';
+                    
+                    const qty = Number(item.quantity) || 0;
+                    const cost = Number(item.unitCost) || 0;
+                    const totalCost = qty * cost;
+                    if (isEntry) {
+                        runningQty += qty;
+                        runningCost += totalCost;
+                    } else if (isExit) {
+                        runningQty -= qty;
+                        runningCost -= totalCost; // Assuming FIFO/Avg logic not strictly enforced, just cash flow subtract
+                    }
+                    return {
+                        ...item,
+                        computedBalance: runningQty,
+                        computedCostBalance: runningCost
+                    };
+                });
+            });
+            const filteredInventory = computed(() => {
+                if (!searchQuery.value) return computedInventory.value;
+                const q = searchQuery.value.toLowerCase();
+                return computedInventory.value.filter(row => 
+                    row.description.toLowerCase().includes(q) ||
+                    row.batch.toLowerCase().includes(q) ||
+                    row.originDestiny.toLowerCase().includes(q)
+                );
+            });
+            const globalCostBalance = computed(() => {
+                if (computedInventory.value.length === 0) return 0;
+                return computedInventory.value[computedInventory.value.length - 1].computedCostBalance;
+            });
+            // ACTIONS
+            const removeRow = (id) => {
+                if(confirm("¿Borrar esta fila?")) {
+                    inventory.value = inventory.value.filter(i => i.id !== id);
+                }
+            };
+            const formatCurrency = (val) => {
+                return new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(val);
+            };
+            // NLP ENGINE
+            const processNLP = () => {
+                const text = nlpInput.value.trim();
+                if (!text) return;
+                // 1. Detect Quantity & Unit (e.g., "50kg", "50 kg", "100.5 litros")
+                const qtyMatch = text.match(/(\d+(\.\d+)?)\s*([a-zA-Z]+)?/);
+                const quantity = qtyMatch ? parseFloat(qtyMatch[1]) : 0;
+                const unit = qtyMatch && qtyMatch[3] ? qtyMatch[3].toLowerCase() : "ud";
+                // 2. Detect Cost (e.g., "a 50", "costo 8.5", "8bs")
+                // Look for 'a X', 'costo X', or just number at end if ambiguous, but let's be safe
+                const costMatch = text.match(/(?:a|costo|precio)\s*(\$?[\d]+(\.\d+)?)/i);
+                const unitCost = costMatch ? parseFloat(costMatch[1].replace('$','')) : 0;
+                // 3. Detect Movement
+                let movement = "Entrada"; // Default
+                if (text.match(/salieron|vend[íi]|salida|envio/i)) movement = "Salida";
+                if (text.match(/inici[ao]|inventario/i)) movement = "Inv. Inicial";
+                // 4. Detect Date (keywords 'hoy', 'ayer')
+                let date = new Date().toISOString().split('T')[0];
+                if (text.toLowerCase().includes("ayer")) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - 1);
+                    date = d.toISOString().split('T')[0];
+                }
+                // 5. Cleanup description (remove detected parts roughly)
+                let description = text
+                    .replace(qtyMatch ? qtyMatch[0] : '', '')
+                    .replace(costMatch ? costMatch[0] : '', '')
+                    .replace(/entraron|salieron|compr[eé]|vend[íi]|hoy|ayer|el|la|los|las|de|un|una/gi, '')
+                    .trim();
+                
+                // Capitalize first letter
+                description = description.charAt(0).toUpperCase() + description.slice(1);
+                // Add to Table
+                inventory.value.push({
+                    id: Date.now(),
+                    date,
+                    description: description || "Item Nuevo",
+                    batch: "GEN-" + Math.floor(Math.random()*1000), // Auto-gen batch if not found
+                    quantity,
+                    movement,
+                    unit,
+                    originDestiny: movement === "Entrada" ? "Proveedor General" : "Cliente Final",
+                    unitCost,
+                    observations: "Ingreso Rápido: " + text
+                });
+                nlpInput.value = "";
+                
+                // Feedback
+                chatMessages.value.push({ role: 'system', text: `He agregado "${description}" (${quantity}${unit}) a la tabla.` });
+                // Scroll to top of table or bottom? Let's just notify.
+            };
+            // AI CHAT
+            const toggleAssistant = () => assistantOpen.value = !assistantOpen.value;
+            const sendChat = () => {
+                const text = chatInput.value.trim();
+                if (!text) return;
+                chatMessages.value.push({ role: 'user', text });
+                chatInput.value = "";
+                // Simulate AI Response / Commands
+                setTimeout(() => {
+                    const lower = text.toLowerCase();
+                    if (lower.includes("borrar todo")) {
+                        if(confirm("⚠ Estás seguro de borrar TODA la tabla?")) {
+                            inventory.value = [];
+                            chatMessages.value.push({ role: 'system', text: "Tabla vaciada correctamente." });
+                        } else {
+                            chatMessages.value.push({ role: 'system', text: "Operación cancelada." });
+                        }
+                    } 
+                    else if (lower.includes("filtrar")) {
+                        const term = lower.replace("filtrar", "").trim();
+                        searchQuery.value = term;
+                        chatMessages.value.push({ role: 'system', text: `Filtro aplicado: "${term}".` });
+                    }
+                    else if (lower.includes("hola")) {
+                        chatMessages.value.push({ role: 'system', text: "¡Hola! Estoy listo para organizar tu inventario." });
+                    }
+                    else {
+                        chatMessages.value.push({ role: 'system', text: "No entendí el comando. Intenta: 'Filtrar X' o usa el Ingreso Rápido." });
+                    }
+                    
+                    // Auto scroll chat
+                    nextTick(() => {
+                        const container = document.getElementById('chat-container');
+                        if(container) container.scrollTop = container.scrollHeight;
+                    });
+                }, 500);
+            };
+            // EXPORT FUNCTIONS
+            const exportToExcel = () => {
+                const data = computedInventory.value.map(row => ({
+                    Fecha: row.date,
+                    Descripcion: row.description,
+                    Lote: row.batch,
+                    Cantidad: row.quantity,
+                    Movimiento: row.movement,
+                    Saldo: row.computedBalance,
+                    CostoU: row.unitCost,
+                    CostoTotal: row.quantity * row.unitCost,
+                    SaldoCosto: row.computedCostBalance
+                }));
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Inventario");
+                XLSX.writeFile(wb, "Inventario_Inteligente.xlsx");
+            };
+            const exportToPDF = () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                doc.text("Reporte de Inventario", 14, 15);
+                doc.setFontSize(10);
+                doc.text("Generado el: " + new Date().toLocaleString(), 14, 22);
+                const tableColumn = ["Fecha", "Desc.", "Mov", "Cant", "Saldo", "Costo U", "Total"];
+                const tableRows = [];
+                computedInventory.value.forEach(row => {
+                    const rowData = [
+                        row.date,
+                        row.description,
+                        row.movement,
+                        row.quantity,
+                        row.computedBalance,
+                        row.unitCost,
+                        (row.quantity * row.unitCost).toFixed(2)
+                    ];
+                    tableRows.push(rowData);
+                });
+                doc.autoTable({
+                    head: [tableColumn],
+                    body: tableRows,
+                    startY: 30,
+                    theme: 'grid',
+                    styles: { fontSize: 8 }
+                });
+                doc.save("Reporte_Inventario.pdf");
+            };
+            return {
+                inventory,
+                filteredInventory,
+                currentDate,
+                nlpInput,
+                processNLP,
+                removeRow,
+                formatCurrency,
+                assistantOpen,
+                toggleAssistant,
+                chatInput,
+                chatMessages,
+                sendChat,
+                searchQuery,
+                currentView,
+                exportToExcel,
+                exportToPDF,
+                globalCostBalance
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
