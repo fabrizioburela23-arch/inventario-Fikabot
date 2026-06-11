@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mundial 2026 · Predictor de Partidos · FIKA Group</title>
+<meta name="description" content="App de análisis y predicción de la Copa Mundial de la FIFA 2026. Probabilidades de cada partido, simulación de grupos y del torneo completo.">
+<style>
+  :root{
+    --bg:#0a0f1c; --bg2:#0e1526; --card:#121a2e; --card2:#172138;
+    --line:#243049; --txt:#e9eef7; --mut:#94a3b8; --mut2:#64748b;
+    --teal:#14b8a6; --teal2:#0ea5a3; --pink:#ec4899; --amber:#f59e0b;
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6; --violet:#8b5cf6;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+    --grad:linear-gradient(120deg,#14b8a6 0%,#3b82f6 45%,#ec4899 100%);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%,rgba(236,72,153,.10),transparent 60%),
+               radial-gradient(1000px 500px at 0% 0%,rgba(20,184,166,.12),transparent 55%),
+               var(--bg);
+    color:var(--txt); line-height:1.5; -webkit-font-smoothing:antialiased; padding-bottom:60px;
+  }
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:#0b1120}
+  ::-webkit-scrollbar-thumb{background:#2a3650;border-radius:6px}
+  ::-webkit-scrollbar-thumb:hover{background:#3a4a6a}
+  a{color:var(--teal);text-decoration:none}
+
+  /* ---------- Header ---------- */
+  header{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+  .hero{max-width:1180px;margin:0 auto;padding:34px 20px 26px;position:relative;z-index:2}
+  .brandrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .logo{width:54px;height:54px;border-radius:15px;background:var(--grad);display:grid;place-items:center;
+        font-size:28px;box-shadow:var(--shadow);flex:none}
+  .htitle h1{font-size:clamp(22px,3.4vw,34px);font-weight:800;letter-spacing:-.5px;line-height:1.1}
+  .htitle .sub{color:var(--mut);font-size:14px;margin-top:2px}
+  .chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 14px;
+        font-size:13px;display:flex;gap:8px;align-items:center;color:var(--txt)}
+  .chip b{color:var(--teal);font-weight:700}
+  .chip .ic{font-size:15px}
+  .disclaimer{margin-top:16px;font-size:12.5px;color:var(--mut2);max-width:880px}
+
+  /* ---------- Nav ---------- */
+  nav{position:sticky;top:0;z-index:50;background:rgba(10,15,28,.86);backdrop-filter:blur(10px);
+      border-bottom:1px solid var(--line)}
+  .navin{max-width:1180px;margin:0 auto;display:flex;gap:6px;padding:8px 12px;overflow-x:auto}
+  .tab{flex:none;border:1px solid transparent;background:transparent;color:var(--mut);
+       padding:9px 15px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;
+       display:flex;align-items:center;gap:7px;transition:.15s}
+  .tab:hover{color:var(--txt);background:var(--card)}
+  .tab.active{color:#06121a;background:var(--grad);border-color:transparent;box-shadow:var(--shadow)}
+
+  /* ---------- Layout ---------- */
+  main{max-width:1180px;margin:0 auto;padding:24px 16px}
+  .panel{display:none;animation:fade .25s ease}
+  .panel.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .secthead{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  .secthead h2{font-size:21px;font-weight:800;letter-spacing:-.3px}
+  .secthead p{color:var(--mut);font-size:13.5px;max-width:680px;margin-top:3px}
+
+  .card{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--line);
+        border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+  .grid{display:grid;gap:14px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+  select,input[type=text]{background:var(--card2);border:1px solid var(--line);color:var(--txt);
+        padding:10px 12px;border-radius:10px;font-size:14px;font-family:inherit;outline:none}
+  select:focus,input:focus{border-color:var(--teal)}
+  .btn{background:var(--grad);color:#06121a;border:none;padding:11px 18px;border-radius:10px;font-weight:700;
+       font-size:14px;cursor:pointer;box-shadow:var(--shadow);transition:.15s;font-family:inherit}
+  .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn.ghost{background:var(--card2);color:var(--txt);border:1px solid var(--line);box-shadow:none}
+  .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+
+  /* ---------- Match card ---------- */
+  .matchwrap{display:grid;gap:12px}
+  .gblock{margin-bottom:8px}
+  .glabel{display:flex;align-items:center;gap:10px;margin:18px 0 10px;font-weight:800;font-size:15px}
+  .gbadge{background:var(--grad);color:#06121a;border-radius:8px;padding:3px 10px;font-size:13px;font-weight:800}
+  .gmeta{color:var(--mut);font-size:12.5px;font-weight:500}
+  .match{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;transition:.15s}
+  .match:hover{border-color:#33425f;transform:translateY(-1px)}
+  .mtop{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+  .team{display:flex;align-items:center;gap:9px;min-width:0}
+  .team.right{justify-content:flex-end;text-align:right}
+  .team.right .tinfo{align-items:flex-end}
+  .flag{font-size:26px;line-height:1;flex:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}
+  .tinfo{display:flex;flex-direction:column;min-width:0}
+  .tname{font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trate{font-size:11.5px;color:var(--mut)}
+  .vs{font-size:11px;color:var(--mut2);font-weight:700;padding:0 6px}
+  .score{font-weight:800;font-size:15px;color:var(--txt);background:var(--card2);border:1px solid var(--line);
+         border-radius:8px;padding:4px 9px;min-width:54px;text-align:center}
+  .bar{display:flex;height:11px;border-radius:7px;overflow:hidden;margin-top:11px;border:1px solid var(--line)}
+  .bar span{display:block;height:100%}
+  .bw{background:linear-gradient(90deg,var(--teal),#19d3c0)}
+  .bd{background:#3b4660}
+  .bl{background:linear-gradient(90deg,#f472b6,var(--pink))}
+  .blegend{display:flex;justify-content:space-between;font-size:11.5px;color:var(--mut);margin-top:6px}
+  .blegend b{color:var(--txt)}
+  .fav{margin-top:9px;font-size:12.5px;color:var(--mut);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .fav .pill{background:rgba(20,184,166,.13);color:var(--teal);border:1px solid rgba(20,184,166,.3);
+             border-radius:999px;padding:2px 10px;font-weight:700;font-size:12px}
+  .fav .pill.draw{background:rgba(148,163,184,.12);color:var(--mut);border-color:#33425f}
+
+  /* ---------- Groups ---------- */
+  .groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+  .gcard h3{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:16px;margin-bottom:4px}
+  .death{font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px}
+  .death.hi{background:rgba(239,68,68,.14);color:#fda4af;border:1px solid rgba(239,68,68,.3)}
+  .death.md{background:rgba(245,158,11,.14);color:#fcd34d;border:1px solid rgba(245,158,11,.3)}
+  .death.lo{background:rgba(34,197,94,.13);color:#86efac;border:1px solid rgba(34,197,94,.3)}
+  table.stand{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+  table.stand th{color:var(--mut2);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;
+                 text-align:right;padding:5px 4px;border-bottom:1px solid var(--line)}
+  table.stand th:first-child{text-align:left}
+  table.stand td{padding:7px 4px;border-bottom:1px solid #1b2540;text-align:right}
+  table.stand td:first-child{text-align:left}
+  .trow td .tcell{display:flex;align-items:center;gap:8px}
+  .trow .pf{font-size:20px}
+  .qz{position:relative}
+  .qz.q1::before,.qz.q2::before,.qz.q3::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;border-radius:3px}
+  .qz.q1::before{background:var(--green)} .qz.q2::before{background:var(--teal)} .qz.q3::before{background:var(--amber)}
+  .advcell{font-weight:700}
+  .advbar{height:5px;border-radius:3px;background:#1b2540;margin-top:4px;overflow:hidden}
+  .advbar i{display:block;height:100%;background:var(--grad)}
+  .glegend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin-top:10px}
+  .glegend span{display:flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:3px;display:inline-block}
+
+  /* ---------- Simulator ---------- */
+  .simgrid{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center}
+  .simteam{text-align:center}
+  .simteam .bigflag{font-size:60px;line-height:1}
+  .simvs{font-size:24px;font-weight:800;color:var(--mut2)}
+  .simout{margin-top:22px}
+  .donut{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  .stat{text-align:center;min-width:108px}
+  .stat .big{font-size:30px;font-weight:800}
+  .stat .lab{font-size:12px;color:var(--mut);margin-top:2px}
+  .kvs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:18px}
+  .kv{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .kv .k{font-size:11.5px;color:var(--mut)} .kv .v{font-size:16px;font-weight:700;margin-top:2px}
+
+  /* ---------- Tournament ---------- */
+  .rank{display:grid;gap:8px}
+  .rline{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;background:var(--card);
+         border:1px solid var(--line);border-radius:12px;padding:10px 13px}
+  .rpos{font-size:18px;font-weight:800;color:var(--mut2);text-align:center}
+  .rmain{min-width:0}
+  .rhead{display:flex;align-items:center;gap:9px;justify-content:space-between}
+  .rhead .nm{display:flex;align-items:center;gap:9px;font-weight:700;font-size:14.5px}
+  .rhead .pct{font-weight:800;font-size:15px;color:var(--teal)}
+  .rbar{height:9px;border-radius:6px;background:#1b2540;margin-top:8px;overflow:hidden}
+  .rbar i{display:block;height:100%;background:var(--grad)}
+  .rmeta{display:flex;gap:14px;font-size:11.5px;color:var(--mut);margin-top:6px;flex-wrap:wrap}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  .simnote{font-size:12.5px;color:var(--mut2)}
+  .spinner{width:16px;height:16px;border:2.5px solid #33425f;border-top-color:var(--teal);border-radius:50%;
+           display:inline-block;animation:spin .7s linear infinite;vertical-align:-3px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---------- Venues / format ---------- */
+  .venues{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .venue{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px}
+  .venue .city{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+  .venue .stad{color:var(--mut);font-size:13px;margin-top:2px}
+  .venue .cty{font-size:11.5px;color:var(--mut2);margin-top:6px}
+  .timeline{display:grid;gap:10px;margin-top:6px}
+  .tl{display:grid;grid-template-columns:130px 1fr;gap:14px;background:var(--card);border:1px solid var(--line);
+      border-radius:12px;padding:12px 14px;align-items:center}
+  .tl .date{font-weight:800;color:var(--teal);font-size:13.5px}
+  .tl .ev{font-size:14px}
+  .tl .ev small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+  .fmtgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:6px}
+  .fmt{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .fmt .n{font-size:30px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .fmt .t{font-weight:700;margin-top:4px} .fmt .d{font-size:13px;color:var(--mut);margin-top:4px}
+
+  /* ---------- Method ---------- */
+  .prose{max-width:820px}
+  .prose h3{margin:20px 0 8px;font-size:17px}
+  .prose p{color:#cbd5e1;font-size:14.5px;margin:8px 0}
+  .prose ul{margin:8px 0 8px 20px;color:#cbd5e1;font-size:14.5px}
+  .prose li{margin:5px 0}
+  .formula{background:#0b1322;border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+           font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:#a5f3eb;overflow-x:auto;margin:10px 0}
+  .src{font-size:12.5px;color:var(--mut)}
+  .src a{margin-right:4px}
+
+  footer{max-width:1180px;margin:30px auto 0;padding:18px 16px;color:var(--mut2);font-size:12.5px;
+          border-top:1px solid var(--line);text-align:center}
+  .hidden{display:none!important}
+  @media(max-width:560px){
+    .simgrid{grid-template-columns:1fr}
+    .simvs{transform:rotate(90deg)}
+    .mtop{grid-template-columns:1fr auto 1fr}
+    .tname{font-size:13.5px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hero">
+    <div class="brandrow">
+      <div class="logo">⚽</div>
+      <div class="htitle">
+        <h1>Mundial 2026 · Predictor de Partidos</h1>
+        <div class="sub">Análisis Predictivo Integral · Copa Mundial de la FIFA 2026 · Canadá · México · EE.&nbsp;UU.</div>
+      </div>
+    </div>
+    <div class="chips">
+      <div class="chip"><span class="ic">🌎</span><b>48</b> selecciones</div>
+      <div class="chip"><span class="ic">🅰️</span><b>12</b> grupos</div>
+      <div class="chip"><span class="ic">🏟️</span><b>16</b> sedes</div>
+      <div class="chip"><span class="ic">📅</span><b>11 jun – 19 jul</b> 2026</div>
+      <div class="chip"><span class="ic">⚔️</span><b>104</b> partidos</div>
+      <div class="chip"><span class="ic">🏆</span> Final: <b>MetLife Stadium</b></div>
+    </div>
+    <p class="disclaimer">
+      Modelo probabilístico basado en el sorteo oficial (Washington, 5 dic 2025), el ranking FIFA y un motor de
+      simulación Poisson + Montecarlo. Las probabilidades son estimaciones estadísticas, no certezas.
+    </p>
+  </div>
+</header>
+
+<nav>
+  <div class="navin" id="nav">
+    <button class="tab active" data-tab="partidos">⚔️ Partidos</button>
+    <button class="tab" data-tab="grupos">🅰️ Grupos</button>
+    <button class="tab" data-tab="simulador">🎯 Simulador</button>
+    <button class="tab" data-tab="torneo">🏆 Predicción del torneo</button>
+    <button class="tab" data-tab="sedes">🏟️ Sedes y formato</button>
+    <button class="tab" data-tab="metodo">📊 Metodología</button>
+  </div>
+</nav>
+
+<main>
+  <!-- ============ PARTIDOS ============ -->
+  <section class="panel active" id="partidos">
+    <div class="secthead">
+      <div>
+        <h2>Todos los choques de la fase de grupos</h2>
+        <p>Cada uno de los 72 partidos con su probabilidad de victoria, empate y derrota, el favorito y un marcador estimado por el modelo.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <input type="text" id="search" placeholder="🔎 Buscar selección (ej. Argentina, España…)" style="flex:1;min-width:200px">
+      <select id="filterGroup">
+        <option value="all">Todos los grupos</option>
+      </select>
+      <select id="sortMatches">
+        <option value="group">Ordenar: por grupo</option>
+        <option value="close">Más parejos primero</option>
+        <option value="lopsided">Más desnivelados primero</option>
+      </select>
+    </div>
+    <div class="matchwrap" id="matchList"></div>
+  </section>
+
+  <!-- ============ GRUPOS ============ -->
+  <section class="panel" id="grupos">
+    <div class="secthead">
+      <div>
+        <h2>Los 12 grupos y sus probabilidades de avanzar</h2>
+        <p>Tabla esperada de cada grupo según <b id="simCountG">…</b> simulaciones Montecarlo. Avanzan los 2 primeros de cada grupo + los 8 mejores terceros.</p>
+      </div>
+      <button class="btn ghost" id="reSimG">↻ Recalcular</button>
+    </div>
+    <div class="glegend" style="margin-bottom:6px">
+      <span><i class="dot" style="background:var(--green)"></i> 1.º (clasifica)</span>
+      <span><i class="dot" style="background:var(--teal)"></i> 2.º (clasifica)</span>
+      <span><i class="dot" style="background:var(--amber)"></i> 3.º (puede clasificar)</span>
+      <span><b>Av%</b> = probabilidad de pasar a octavos/dieciseisavos</span>
+    </div>
+    <div class="groups" id="groupList"></div>
+  </section>
+
+  <!-- ============ SIMULADOR ============ -->
+  <section class="panel" id="simulador">
+    <div class="secthead">
+      <div>
+        <h2>Simulador cara a cara</h2>
+        <p>Elige dos selecciones cualesquiera y obtén la predicción del enfrentamiento al instante.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="simgrid">
+        <div class="simteam">
+          <div class="bigflag" id="simFlagA">🇦🇷</div>
+          <select id="simA" style="width:100%;margin-top:8px"></select>
+        </div>
+        <div class="simvs">VS</div>
+        <div class="simteam">
+          <div class="bigflag" id="simFlagB">🇫🇷</div>
+          <select id="simB" style="width:100%;margin-top:8px"></select>
+        </div>
+      </div>
+      <div class="controls" style="justify-content:center;margin:18px 0 0">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mut)">
+          <input type="checkbox" id="simHost"> Aplicar ventaja de local (anfitrión)
+        </label>
+        <button class="btn" id="simBtn">🎯 Predecir resultado</button>
+      </div>
+      <div class="simout" id="simOut"></div>
+    </div>
+  </section>
+
+  <!-- ============ TORNEO ============ -->
+  <section class="panel" id="torneo">
+    <div class="secthead">
+      <div>
+        <h2>¿Quién levantará la copa?</h2>
+        <p>Simulación Montecarlo del torneo completo (grupos → eliminatorias) para estimar quién tiene más opciones de ser campeón.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn" id="runTour">🏆 Simular torneo</button>
+        <select id="nSims">
+          <option value="2000">2.000 simulaciones (rápido)</option>
+          <option value="5000" selected>5.000 simulaciones</option>
+          <option value="10000">10.000 simulaciones (preciso)</option>
+        </select>
+        <span class="simnote" id="tourNote">Pulsa «Simular torneo» para calcular las probabilidades de título.</span>
+      </div>
+      <div id="tourOut" class="grid" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <!-- ============ SEDES ============ -->
+  <section class="panel" id="sedes">
+    <div class="secthead">
+      <div>
+        <h2>Sedes, formato y calendario</h2>
+        <p>El primer Mundial con 48 selecciones y tres países anfitriones.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:16px;margin:6px 0 12px">🧩 Formato del torneo</h3>
+    <div class="fmtgrid">
+      <div class="fmt"><div class="n">48</div><div class="t">Selecciones</div><div class="d">Récord histórico. 16 más que en 2022.</div></div>
+      <div class="fmt"><div class="n">12</div><div class="t">Grupos de 4</div><div class="d">Grupos A a L. Todos contra todos.</div></div>
+      <div class="fmt"><div class="n">32</div><div class="t">Clasifican a eliminatorias</div><div class="d">2 primeros de cada grupo + 8 mejores terceros.</div></div>
+      <div class="fmt"><div class="n">104</div><div class="t">Partidos totales</div><div class="d">72 de grupos + 32 de eliminación directa.</div></div>
+      <div class="fmt"><div class="n">8</div><div class="t">Rondas finales</div><div class="d">Dieciseisavos → octavos → cuartos → semis → final.</div></div>
+      <div class="fmt"><div class="n">39</div><div class="t">Días de competición</div><div class="d">Del 11 de junio al 19 de julio de 2026.</div></div>
+    </div>
+
+    <h3 style="font-size:16px;margin:24px 0 12px">📅 Fechas clave</h3>
+    <div class="timeline" id="timeline"></div>
+
+    <h3 style="font-size:16px;margin:24px 0 12px">🏟️ Las 16 sedes</h3>
+    <div class="venues" id="venueList"></div>
+  </section>
+
+  <!-- ============ METODO ============ -->
+  <section class="panel" id="metodo">
+    <div class="secthead"><div><h2>Metodología y fuentes</h2></div></div>
+    <div class="prose">
+      <p>Esta aplicación es un <b>modelo probabilístico</b>. No predice el futuro: estima, con estadística, qué es más probable que ocurra en cada partido y en el torneo.</p>
+
+      <h3>1. Índice de poder de cada selección</h3>
+      <p>A cada selección se le asigna un <b>índice de poder</b> derivado del <b>ranking FIFA</b> (actualización previa al sorteo) y del rendimiento reciente. Cuanto mayor es el índice, más fuerte se considera al equipo. Los tres anfitriones (México, Canadá y EE.&nbsp;UU.) reciben una bonificación de localía en la fase de grupos.</p>
+
+      <h3>2. Motor de probabilidades (Poisson + Elo)</h3>
+      <p>Para cada partido convertimos la diferencia de índices en una cantidad esperada de goles para cada equipo, y modelamos los goles con una <b>distribución de Poisson</b>. Sumando todos los marcadores posibles obtenemos la probabilidad de victoria, empate y derrota.</p>
+      <div class="formula">λ_local = 1.30 · e^(+Δ/400)   ·   λ_visita = 1.30 · e^(−Δ/400)<br>Δ = índice_A − índice_B  (+ bonus de local)<br>P(gana A) = Σ  P(goles_A = i)·P(goles_B = j)   para todo i &gt; j</div>
+      <p>Con índices iguales el modelo produce ~26&nbsp;% de empate y ~37&nbsp;% de victoria para cada lado, valores realistas para el fútbol de selecciones.</p>
+
+      <h3>3. Simulación del torneo (Montecarlo)</h3>
+      <p>Para los grupos y el título no basta un partido: <b>simulamos el torneo miles de veces</b>. En cada simulación se juegan los 72 partidos de grupos (con goles aleatorios según el modelo), se ordenan las tablas con los criterios oficiales (puntos, diferencia de goles, goles a favor), se eligen los <b>8 mejores terceros</b> y se disputa el cuadro de eliminatorias hasta la final. Contando cuántas veces gana cada selección obtenemos su probabilidad de campeón, de llegar a la final, etc.</p>
+
+      <h3>4. Limitaciones honestas</h3>
+      <ul>
+        <li>El fútbol tiene una alta dosis de azar: una sola pelota cambia un Mundial. Trata los porcentajes como tendencias, no como certezas.</li>
+        <li>El índice no captura lesiones de último momento, estado de forma del día ni factores emocionales.</li>
+        <li>El cuadro de eliminatorias usa un emparejamiento por siembra simplificado; el oficial depende de qué terceros clasifican.</li>
+      </ul>
+
+      <h3>📂 Sobre tus archivos</h3>
+      <p>Los documentos que adjuntaste (<code>mundial2026_COMPLETO.json</code> y el <code>.docx</code> de análisis predictivo) estaban en rutas locales de tu equipo y <b>no llegaron a esta sesión en la nube</b>, así que no pude leer su contenido. Para que la app fuera completa y precisa, la construí con <b>datos reales verificados</b> del sorteo y el ranking oficial. Si pegas aquí el contenido de tu JSON (índices, pesos o tu propio modelo), lo integro tal cual en minutos.</p>
+
+      <h3>🔗 Fuentes</h3>
+      <p class="src">
+        <a href="https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/final-draw-results" target="_blank">FIFA · Resultados del sorteo</a> ·
+        <a href="https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_draw" target="_blank">Wikipedia · Sorteo 2026</a> ·
+        <a href="https://www.mlssoccer.com/news/fifa-2026-world-cup-draw-full-results-every-group" target="_blank">MLSSoccer · Grupos completos</a> ·
+        <a href="https://www.nbcsports.com/soccer/news/2026-world-cup-group-stage-table-full-standings-for-all-12-groups" target="_blank">NBC Sports · Tablas</a> ·
+        <a href="https://www.pbs.org/newshour/nation/the-2026-world-cup-has-arrived-heres-what-to-know-about-the-16-stadiums-hosting-matches" target="_blank">PBS · 16 estadios</a> ·
+        <a href="https://inside.fifa.com/fifa-world-ranking/men" target="_blank">FIFA · Ranking mundial</a>
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  ⚽ <b>Mundial 2026 · Predictor</b> — hecho para FIKA Group · Modelo Poisson/Elo + Montecarlo ·
+  Datos del sorteo oficial del 5 de diciembre de 2025. Las predicciones son estimaciones estadísticas.
+</footer>
+
+<script>
+"use strict";
+/* ============================================================
+   DATOS — Sorteo oficial Mundial 2026 (reconciliado con los 4 bombos)
+   pos = posición sembrada en el grupo · pot = bombo · idx = índice de poder (base ranking FIFA)
+   ============================================================ */
+const HOST = {mex:true, can:true, usa:true};
+const CONF = {UEFA:'#3b82f6',CONMEBOL:'#22c55e',CONCACAF:'#f59e0b',CAF:'#ef4444',AFC:'#8b5cf6',OFC:'#14b8a6'};
+
+const T = {
+  // GROUP A
+  mex:{n:'México',f:'🇲🇽',c:'CONCACAF',g:'A',pos:1,pot:1,idx:1656,host:1},
+  kor:{n:'Corea del Sur',f:'🇰🇷',c:'AFC',g:'A',pos:2,pot:2,idx:1572},
+  rsa:{n:'Sudáfrica',f:'🇿🇦',c:'CAF',g:'A',pos:3,pot:3,idx:1447},
+  cze:{n:'Chequia',f:'🇨🇿',c:'UEFA',g:'A',pos:4,pot:4,idx:1491},
+  // GROUP B
+  can:{n:'Canadá',f:'🇨🇦',c:'CONCACAF',g:'B',pos:1,pot:1,idx:1538,host:1},
+  sui:{n:'Suiza',f:'🇨🇭',c:'UEFA',g:'B',pos:2,pot:2,idx:1650},
+  qat:{n:'Catar',f:'🇶🇦',c:'AFC',g:'B',pos:3,pot:3,idx:1450},
+  bih:{n:'Bosnia y Herzegovina',f:'🇧🇦',c:'UEFA',g:'B',pos:4,pot:4,idx:1418},
+  // GROUP C
+  bra:{n:'Brasil',f:'🇧🇷',c:'CONMEBOL',g:'C',pos:1,pot:1,idx:1758},
+  mar:{n:'Marruecos',f:'🇲🇦',c:'CAF',g:'C',pos:2,pot:2,idx:1713},
+  sco:{n:'Escocia',f:'🏴󠁧󠁢󠁳󠁣󠁴󠁿',c:'UEFA',g:'C',pos:3,pot:3,idx:1493},
+  hai:{n:'Haití',f:'🇭🇹',c:'CONCACAF',g:'C',pos:4,pot:4,idx:1275},
+  // GROUP D
+  usa:{n:'Estados Unidos',f:'🇺🇸',c:'CONCACAF',g:'D',pos:1,pot:1,idx:1664,host:1},
+  aus:{n:'Australia',f:'🇦🇺',c:'AFC',g:'D',pos:2,pot:2,idx:1517},
+  par:{n:'Paraguay',f:'🇵🇾',c:'CONMEBOL',g:'D',pos:3,pot:3,idx:1476},
+  tur:{n:'Türkiye',f:'🇹🇷',c:'UEFA',g:'D',pos:4,pot:4,idx:1548},
+  // GROUP E
+  ger:{n:'Alemania',f:'🇩🇪',c:'UEFA',g:'E',pos:1,pot:1,idx:1724},
+  ecu:{n:'Ecuador',f:'🇪🇨',c:'CONMEBOL',g:'E',pos:2,pot:2,idx:1568},
+  civ:{n:'Costa de Marfil',f:'🇨🇮',c:'CAF',g:'E',pos:3,pot:3,idx:1485},
+  cuw:{n:'Curazao',f:'🇨🇼',c:'CONCACAF',g:'E',pos:4,pot:4,idx:1310},
+  // GROUP F
+  ned:{n:'Países Bajos',f:'🇳🇱',c:'UEFA',g:'F',pos:1,pot:1,idx:1760},
+  jpn:{n:'Japón',f:'🇯🇵',c:'AFC',g:'F',pos:2,pot:2,idx:1652},
+  tun:{n:'Túnez',f:'🇹🇳',c:'CAF',g:'F',pos:3,pot:3,idx:1500},
+  swe:{n:'Suecia',f:'🇸🇪',c:'UEFA',g:'F',pos:4,pot:4,idx:1529},
+  // GROUP G
+  bel:{n:'Bélgica',f:'🇧🇪',c:'UEFA',g:'G',pos:1,pot:1,idx:1740},
+  irn:{n:'Irán',f:'🇮🇷',c:'AFC',g:'G',pos:2,pot:2,idx:1618},
+  egy:{n:'Egipto',f:'🇪🇬',c:'CAF',g:'G',pos:3,pot:3,idx:1512},
+  nzl:{n:'Nueva Zelanda',f:'🇳🇿',c:'OFC',g:'G',pos:4,pot:4,idx:1300},
+  // GROUP H
+  esp:{n:'España',f:'🇪🇸',c:'UEFA',g:'H',pos:1,pot:1,idx:1875},
+  uru:{n:'Uruguay',f:'🇺🇾',c:'CONMEBOL',g:'H',pos:2,pot:2,idx:1679},
+  ksa:{n:'Arabia Saudita',f:'🇸🇦',c:'AFC',g:'H',pos:3,pot:3,idx:1428},
+  cpv:{n:'Cabo Verde',f:'🇨🇻',c:'CAF',g:'H',pos:4,pot:4,idx:1352},
+  // GROUP I
+  fra:{n:'Francia',f:'🇫🇷',c:'UEFA',g:'I',pos:1,pot:1,idx:1862},
+  sen:{n:'Senegal',f:'🇸🇳',c:'CAF',g:'I',pos:2,pot:2,idx:1630},
+  nor:{n:'Noruega',f:'🇳🇴',c:'UEFA',g:'I',pos:3,pot:3,idx:1528},
+  irq:{n:'Irak',f:'🇮🇶',c:'AFC',g:'I',pos:4,pot:4,idx:1382},
+  // GROUP J
+  arg:{n:'Argentina',f:'🇦🇷',c:'CONMEBOL',g:'J',pos:1,pot:1,idx:1870},
+  aut:{n:'Austria',f:'🇦🇹',c:'UEFA',g:'J',pos:2,pot:2,idx:1552},
+  alg:{n:'Argelia',f:'🇩🇿',c:'CAF',g:'J',pos:3,pot:3,idx:1498},
+  jor:{n:'Jordania',f:'🇯🇴',c:'AFC',g:'J',pos:4,pot:4,idx:1370},
+  // GROUP K
+  por:{n:'Portugal',f:'🇵🇹',c:'UEFA',g:'K',pos:1,pot:1,idx:1778},
+  col:{n:'Colombia',f:'🇨🇴',c:'CONMEBOL',g:'K',pos:2,pot:2,idx:1697},
+  uzb:{n:'Uzbekistán',f:'🇺🇿',c:'AFC',g:'K',pos:3,pot:3,idx:1437},
+  cod:{n:'RD Congo',f:'🇨🇩',c:'CAF',g:'K',pos:4,pot:4,idx:1395},
+  // GROUP L
+  eng:{n:'Inglaterra',f:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',c:'UEFA',g:'L',pos:1,pot:1,idx:1825},
+  cro:{n:'Croacia',f:'🇭🇷',c:'UEFA',g:'L',pos:2,pot:2,idx:1716},
+  pan:{n:'Panamá',f:'🇵🇦',c:'CONCACAF',g:'L',pos:3,pot:3,idx:1420},
+  gha:{n:'Ghana',f:'🇬🇭',c:'CAF',g:'L',pos:4,pot:4,idx:1348},
+};
+const IDS = Object.keys(T);
+IDS.forEach(id=>{T[id].id=id;});
+const GROUPS = 'ABCDEFGHIJKL'.split('');
+const groupTeams = g => IDS.filter(id=>T[id].g===g).sort((a,b)=>T[a].pos-T[b].pos);
+
+/* ---- generate the 72 group matches (round robin per group) ---- */
+const MATCHES = [];
+GROUPS.forEach(g=>{
+  const ts = groupTeams(g);
+  for(let i=0;i<ts.length;i++)
+    for(let j=i+1;j<ts.length;j++)
+      MATCHES.push({g, a:ts[i], b:ts[j]});
+});
+
+/* ============================================================
+   MODELO — Poisson bivariante a partir de los índices
+   ============================================================ */
+const HOST_BONUS = 45;        // ventaja de local para anfitriones en fase de grupos
+const GOAL_BASE = 1.30, GOAL_DIV = 400, LMAX = 4.6, LMIN = 0.22;
+
+function lambdas(idxA, idxB, hostA=false, hostB=false){
+  let d = (idxA + (hostA?HOST_BONUS:0)) - (idxB + (hostB?HOST_BONUS:0));
+  let la = GOAL_BASE*Math.exp(d/GOAL_DIV), lb = GOAL_BASE*Math.exp(-d/GOAL_DIV);
+  return [Math.min(LMAX,Math.max(LMIN,la)), Math.min(LMAX,Math.max(LMIN,lb))];
+}
+function poissonPmf(lambda, kMax=9){
+  const out=[]; let p=Math.exp(-lambda);
+  for(let k=0;k<=kMax;k++){ out.push(p); p*=lambda/(k+1); }
+  return out;
+}
+// closed-form W/D/L + expected score for display
+function predict(idxA, idxB, hostA=false, hostB=false){
+  const [la,lb]=lambdas(idxA,idxB,hostA,hostB);
+  const pa=poissonPmf(la), pb=poissonPmf(lb);
+  let w=0,dr=0,l=0;
+  for(let i=0;i<pa.length;i++)for(let j=0;j<pb.length;j++){
+    const pr=pa[i]*pb[j];
+    if(i>j)w+=pr; else if(i===j)dr+=pr; else l+=pr;
+  }
+  const s=w+dr+l; w/=s;dr/=s;l/=s;
+  return {w,dr,l,la,lb,scA:Math.round(la),scB:Math.round(lb)};
+}
+// fast Poisson sampler (Knuth)
+function rpois(lambda){
+  const L=Math.exp(-lambda); let k=0,p=1;
+  do{k++;p*=Math.random();}while(p>L);
+  return k-1;
+}
+function simGoals(idxA,idxB,hostA=false,hostB=false){
+  const [la,lb]=lambdas(idxA,idxB,hostA,hostB);
+  return [rpois(la),rpois(lb)];
+}
+
+/* ============================================================
+   MONTECARLO — torneo completo
+   ============================================================ */
+function seedOrder(n){
+  let pls=[1,2];
+  while(pls.length<n){
+    const sum=pls.length*2+1, out=[];
+    for(const p of pls){ out.push(p); out.push(sum-p); }
+    pls=out;
+  }
+  return pls;
+}
+const SEED32 = seedOrder(32);
+
+function simulateTournament(){
+  // group stage
+  const st={}; IDS.forEach(id=>st[id]={p:0,gf:0,ga:0});
+  for(const m of MATCHES){
+    const A=T[m.a],B=T[m.b];
+    const [ga,gb]=simGoals(A.idx,B.idx,!!A.host,!!B.host);
+    st[m.a].gf+=ga;st[m.a].ga+=gb;st[m.b].gf+=gb;st[m.b].ga+=ga;
+    if(ga>gb)st[m.a].p+=3; else if(gb>ga)st[m.b].p+=3; else {st[m.a].p++;st[m.b].p++;}
+  }
+  const rankFn=(x,y)=>{
+    const sx=st[x],sy=st[y];
+    if(sy.p!==sx.p)return sy.p-sx.p;
+    if((sy.gf-sy.ga)!==(sx.gf-sx.ga))return (sy.gf-sy.ga)-(sx.gf-sx.ga);
+    if(sy.gf!==sx.gf)return sy.gf-sx.gf;
+    return Math.random()-0.5;
+  };
+  const winners=[],runners=[],thirds=[];
+  GROUPS.forEach(g=>{
+    const ts=groupTeams(g).slice().sort(rankFn);
+    winners.push(ts[0]);runners.push(ts[1]);thirds.push(ts[2]);
+  });
+  thirds.sort(rankFn);
+  const bestThirds=thirds.slice(0,8);
+  // 32 qualifiers, seeded by index into a balanced bracket
+  const q=[...winners,...runners,...bestThirds].sort((x,y)=>T[y].idx-T[x].idx);
+  let bracket=SEED32.map(s=>q[s-1]);
+  // knockout: R32 -> R16 -> QF -> SF -> Final
+  const reached={r16:[],qf:[],sf:[],fn:[]};
+  function roundPlay(arr,store){
+    const next=[];
+    for(let i=0;i<arr.length;i+=2){
+      const A=T[arr[i]],B=T[arr[i+1]];
+      let [ga,gb]=simGoals(A.idx,B.idx);
+      let win;
+      if(ga>gb)win=arr[i]; else if(gb>ga)win=arr[i+1];
+      else { // penalties ~ by index
+        const e=1/(1+Math.pow(10,(B.idx-A.idx)/600));
+        win=Math.random()<e?arr[i]:arr[i+1];
+      }
+      next.push(win); if(store)store.push(win);
+    }
+    return next;
+  }
+  let r=roundPlay(bracket,reached.r16);   // -> 16
+  r=roundPlay(r,reached.qf);              // -> 8
+  r=roundPlay(r,reached.sf);              // -> 4
+  r=roundPlay(r,reached.fn);              // -> 2 (finalists)
+  const champ=roundPlay(r,null)[0];
+  return {qualifiers:q, winners, finalists:reached.fn, semis:reached.sf, champ};
+}
+
+let TOUR=null;       // aggregate results
+let GROUPSIM=null;   // advancement stats
+
+function runSims(n){
+  const champ={},final={},semi={},adv={},gwin={};
+  IDS.forEach(id=>{champ[id]=0;final[id]=0;semi[id]=0;adv[id]=0;gwin[id]=0;});
+  for(let s=0;s<n;s++){
+    const r=simulateTournament();
+    r.qualifiers.forEach(id=>adv[id]++);
+    r.winners.forEach(id=>gwin[id]++);
+    r.semis.forEach(id=>semi[id]++);
+    r.finalists.forEach(id=>final[id]++);
+    champ[r.champ]++;
+  }
+  TOUR={n,champ,final,semi,adv,gwin};
+  return TOUR;
+}
+
+/* group-position simulation (separate, lighter, with full ordering) */
+function runGroupSims(n){
+  const gpos={},adv={},gwin={};
+  IDS.forEach(id=>{gpos[id]={1:0,2:0,3:0,4:0};adv[id]=0;gwin[id]=0;});
+  for(let s=0;s<n;s++){
+    const st={}; IDS.forEach(id=>st[id]={p:0,gf:0,ga:0});
+    for(const m of MATCHES){
+      const A=T[m.a],B=T[m.b];
+      const [ga,gb]=simGoals(A.idx,B.idx,!!A.host,!!B.host);
+      st[m.a].gf+=ga;st[m.a].ga+=gb;st[m.b].gf+=gb;st[m.b].ga+=ga;
+      if(ga>gb)st[m.a].p+=3; else if(gb>ga)st[m.b].p+=3; else {st[m.a].p++;st[m.b].p++;}
+    }
+    const rankFn=(x,y)=>{const sx=st[x],sy=st[y];
+      if(sy.p!==sx.p)return sy.p-sx.p;
+      if((sy.gf-sy.ga)!==(sx.gf-sx.ga))return (sy.gf-sy.ga)-(sx.gf-sx.ga);
+      if(sy.gf!==sx.gf)return sy.gf-sx.gf;return Math.random()-0.5;};
+    const thirds=[];
+    GROUPS.forEach(g=>{
+      const ts=groupTeams(g).slice().sort(rankFn);
+      ts.forEach((id,k)=>gpos[id][k+1]++);
+      gwin[ts[0]]++; adv[ts[0]]++; adv[ts[1]]++;
+      thirds.push({id:ts[2],s:st[ts[2]]});
+    });
+    thirds.sort((x,y)=>{
+      if(y.s.p!==x.s.p)return y.s.p-x.s.p;
+      if((y.s.gf-y.s.ga)!==(x.s.gf-x.s.ga))return (y.s.gf-y.s.ga)-(x.s.gf-x.s.ga);
+      if(y.s.gf!==x.s.gf)return y.s.gf-x.s.gf;return Math.random()-0.5;});
+    thirds.slice(0,8).forEach(o=>adv[o.id]++);
+  }
+  GROUPSIM={n,gpos,adv,gwin};
+  return GROUPSIM;
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+const $=s=>document.querySelector(s);
+const pct=x=>Math.round(x*100);
+const tag=(id)=>`<span class="flag">${T[id].f}</span>`;
+
+/* ---- tabs ---- */
+$('#nav').addEventListener('click',e=>{
+  const b=e.target.closest('.tab'); if(!b)return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  b.classList.add('active'); $('#'+b.dataset.tab).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+/* ---- MATCHES ---- */
+function matchCard(m){
+  const A=T[m.a],B=T[m.b];
+  const pr=predict(A.idx,B.idx,!!A.host,!!B.host);
+  const favTxt = pr.w>pr.l && pr.w>=pr.dr ? `Favorito: <b>${A.n}</b>`
+              : pr.l>pr.w && pr.l>=pr.dr ? `Favorito: <b>${B.n}</b>`
+              : `Partido muy parejo`;
+  const favClass = (Math.max(pr.w,pr.l,pr.dr)===pr.dr)?'pill draw':'pill';
+  const favP = pct(Math.max(pr.w,pr.dr,pr.l));
+  return `<div class="match" data-a="${A.n.toLowerCase()}" data-b="${B.n.toLowerCase()}">
+    <div class="mtop">
+      <div class="team"><span class="flag">${A.f}</span>
+        <div class="tinfo"><span class="tname">${A.n}${A.host?' 🏠':''}</span><span class="trate">Índice ${A.idx}</span></div></div>
+      <div class="score">${pr.scA} - ${pr.scB}</div>
+      <div class="team right">
+        <div class="tinfo"><span class="tname">${B.n}${B.host?' 🏠':''}</span><span class="trate">Índice ${B.idx}</span></div>
+        <span class="flag">${B.f}</span></div>
+    </div>
+    <div class="bar">
+      <span class="bw" style="width:${pr.w*100}%"></span>
+      <span class="bd" style="width:${pr.dr*100}%"></span>
+      <span class="bl" style="width:${pr.l*100}%"></span>
+    </div>
+    <div class="blegend">
+      <span>Gana ${A.n}: <b>${pct(pr.w)}%</b></span>
+      <span>Empate: <b>${pct(pr.dr)}%</b></span>
+      <span>Gana ${B.n}: <b>${pct(pr.l)}%</b></span>
+    </div>
+    <div class="fav"><span class="${favClass}">${favP}%</span> ${favTxt}</div>
+  </div>`;
+}
+function renderMatches(){
+  const q=$('#search').value.trim().toLowerCase();
+  const fg=$('#filterGroup').value;
+  const sort=$('#sortMatches').value;
+  let list=MATCHES.filter(m=>{
+    if(fg!=='all'&&m.g!==fg)return false;
+    if(q){const A=T[m.a].n.toLowerCase(),B=T[m.b].n.toLowerCase();
+      if(!A.includes(q)&&!B.includes(q))return false;}
+    return true;
+  });
+  if(sort!=='group'){
+    list=list.map(m=>{const A=T[m.a],B=T[m.b];const pr=predict(A.idx,B.idx,!!A.host,!!B.host);
+      return {m,gap:Math.abs(pr.w-pr.l)};});
+    list.sort((x,y)=>sort==='close'?x.gap-y.gap:y.gap-x.gap);
+    $('#matchList').innerHTML=`<div class="grid">${list.map(o=>matchCard(o.m)).join('')}</div>`;
+    return;
+  }
+  let html='';
+  GROUPS.forEach(g=>{
+    const ms=list.filter(m=>m.g===g); if(!ms.length)return;
+    html+=`<div class="gblock"><div class="glabel"><span class="gbadge">Grupo ${g}</span>
+      <span class="gmeta">${groupTeams(g).map(id=>T[id].f).join(' ')} · ${ms.length} partidos</span></div>
+      <div class="grid">${ms.map(matchCard).join('')}</div></div>`;
+  });
+  $('#matchList').innerHTML = html || `<div class="card" style="text-align:center;color:var(--mut)">Sin partidos para «${q}».</div>`;
+}
+$('#search').addEventListener('input',renderMatches);
+$('#filterGroup').addEventListener('change',renderMatches);
+$('#sortMatches').addEventListener('change',renderMatches);
+GROUPS.forEach(g=>{const o=document.createElement('option');o.value=g;o.textContent='Grupo '+g;$('#filterGroup').appendChild(o);});
+
+/* ---- GROUPS ---- */
+function deathScore(g){return groupTeams(g).reduce((s,id)=>s+T[id].idx,0);}
+function renderGroups(){
+  const sim=GROUPSIM;
+  $('#simCountG').textContent = sim? sim.n.toLocaleString('es') : '…';
+  let html='';
+  // death thresholds
+  const scores=GROUPS.map(deathScore); const mx=Math.max(...scores),mn=Math.min(...scores);
+  GROUPS.forEach(g=>{
+    const ds=deathScore(g); const norm=(ds-mn)/(mx-mn||1);
+    const dlab = norm>0.66?['hi','🔥 Grupo difícil']:norm>0.33?['md','⚠️ Equilibrado']:['lo','🟢 Asequible'];
+    const ts=groupTeams(g).slice();
+    if(sim) ts.sort((a,b)=>sim.adv[b]-sim.adv[a] || (sim.gpos[b][1]-sim.gpos[a][1]));
+    let rows = ts.map(id=>{
+      const t=T[id];
+      const av = sim? sim.adv[id]/sim.n : null;
+      const w  = sim? sim.gpos[id][1]/sim.n : null;
+      const dotc = CONF[t.c];
+      const avTxt = sim? pct(av)+'%':'—';
+      const qclass = sim? (ts.indexOf(id)===0?'q1':ts.indexOf(id)===1?'q2':ts.indexOf(id)===2?'q3':''):'';
+      return `<tr class="trow">
+        <td class="qz ${qclass}"><div class="tcell"><span class="pf">${t.f}</span>
+          <span><div style="font-weight:700">${t.n}${t.host?' 🏠':''}</div>
+          <div style="font-size:11px;color:${dotc}">${t.c}</div></span></div></td>
+        <td>${t.idx}</td>
+        <td class="advcell">${avTxt}${sim?`<div class="advbar"><i style="width:${av*100}%"></i></div>`:''}</td>
+      </tr>`;
+    }).join('');
+    html+=`<div class="card gcard">
+      <h3><span>Grupo ${g}</span><span class="death ${dlab[0]}">${dlab[1]}</span></h3>
+      <table class="stand"><thead><tr><th>Selección</th><th>Índice</th><th>Avanza</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      ${sim?'':'<div class="glegend"><span><span class="spinner"></span> calculando…</span></div>'}
+    </div>`;
+  });
+  $('#groupList').innerHTML=html;
+}
+$('#reSimG').addEventListener('click',()=>{
+  $('#reSimG').disabled=true;$('#reSimG').textContent='↻ Calculando…';
+  setTimeout(()=>{runGroupSims(4000);renderGroups();$('#reSimG').disabled=false;$('#reSimG').textContent='↻ Recalcular';},30);
+});
+
+/* ---- SIMULATOR ---- */
+function fillTeamSelect(sel,def){
+  const opts=IDS.slice().sort((a,b)=>T[a].n.localeCompare(T[b].n))
+    .map(id=>`<option value="${id}" ${id===def?'selected':''}>${T[id].f} ${T[id].n} (G${T[id].g})</option>`).join('');
+  sel.innerHTML=opts;
+}
+fillTeamSelect($('#simA'),'arg'); fillTeamSelect($('#simB'),'fra');
+function syncFlags(){$('#simFlagA').textContent=T[$('#simA').value].f;$('#simFlagB').textContent=T[$('#simB').value].f;}
+$('#simA').addEventListener('change',syncFlags);$('#simB').addEventListener('change',syncFlags);
+function runSimulator(){
+  const a=$('#simA').value,b=$('#simB').value,A=T[a],B=T[b];
+  if(a===b){$('#simOut').innerHTML='<div style="text-align:center;color:var(--amber);padding:14px">Elige dos selecciones distintas.</div>';return;}
+  const host=$('#simHost').checked;
+  const pr=predict(A.idx,B.idx,host&&!!A.host,host&&!!B.host);
+  const favName = pr.w>=pr.l?A.n:B.n;
+  const favPc = Math.max(pr.w,pr.l);
+  $('#simOut').innerHTML=`
+    <div class="bar" style="height:16px">
+      <span class="bw" style="width:${pr.w*100}%"></span>
+      <span class="bd" style="width:${pr.dr*100}%"></span>
+      <span class="bl" style="width:${pr.l*100}%"></span>
+    </div>
+    <div class="donut">
+      <div class="stat"><div class="big" style="color:var(--teal)">${pct(pr.w)}%</div><div class="lab">Gana ${A.n}</div></div>
+      <div class="stat"><div class="big" style="color:var(--mut)">${pct(pr.dr)}%</div><div class="lab">Empate</div></div>
+      <div class="stat"><div class="big" style="color:var(--pink)">${pct(pr.l)}%</div><div class="lab">Gana ${B.n}</div></div>
+    </div>
+    <div class="kvs">
+      <div class="kv"><div class="k">Marcador más probable</div><div class="v">${A.f} ${pr.scA} - ${pr.scB} ${B.f}</div></div>
+      <div class="kv"><div class="k">Goles esperados</div><div class="v">${pr.la.toFixed(2)} vs ${pr.lb.toFixed(2)}</div></div>
+      <div class="kv"><div class="k">Favorito</div><div class="v">${favName} · ${pct(favPc)}%</div></div>
+      <div class="kv"><div class="k">Diferencia de índice</div><div class="v">${Math.abs(A.idx-B.idx)} pts</div></div>
+    </div>`;
+}
+$('#simBtn').addEventListener('click',runSimulator);
+$('#simHost').addEventListener('change',runSimulator);
+
+/* ---- TOURNAMENT ---- */
+function renderTour(){
+  if(!TOUR){$('#tourOut').innerHTML='';return;}
+  const n=TOUR.n;
+  const order=IDS.slice().sort((a,b)=>TOUR.champ[b]-TOUR.champ[a]);
+  const top=order.slice(0,16);
+  const max=TOUR.champ[order[0]]/n||1;
+  const champId=order[0];
+  let lines=top.map((id,i)=>{
+    const t=T[id];const c=TOUR.champ[id]/n,fi=TOUR.final[id]/n,se=TOUR.semi[id]/n,ad=TOUR.adv[id]/n;
+    return `<div class="rline">
+      <div class="rpos">${i+1}</div>
+      <div class="rmain">
+        <div class="rhead"><div class="nm"><span class="flag">${t.f}</span> ${t.n}</div>
+          <div class="pct">${(c*100).toFixed(1)}%</div></div>
+        <div class="rbar"><i style="width:${Math.max(2,(c/max)*100)}%"></i></div>
+        <div class="rmeta"><span>🏆 Campeón <b>${(c*100).toFixed(1)}%</b></span>
+          <span>🥇 Final <b>${pct(fi)}%</b></span>
+          <span>🎖️ Semis <b>${pct(se)}%</b></span>
+          <span>✅ Avanza <b>${pct(ad)}%</b></span></div>
+      </div></div>`;
+  }).join('');
+  $('#tourOut').innerHTML=`
+    <div class="card" style="text-align:center;background:linear-gradient(135deg,rgba(20,184,166,.12),rgba(236,72,153,.12))">
+      <div style="font-size:13px;color:var(--mut)">Campeón más probable según ${n.toLocaleString('es')} simulaciones</div>
+      <div style="font-size:46px;margin-top:4px">${T[champId].f}</div>
+      <div style="font-size:24px;font-weight:800">${T[champId].n}</div>
+      <div style="color:var(--teal);font-weight:700;font-size:18px">${(TOUR.champ[champId]/n*100).toFixed(1)}% de probabilidad de título</div>
+    </div>
+    <div class="rank">${lines}</div>`;
+}
+$('#runTour').addEventListener('click',()=>{
+  const n=parseInt($('#nSims').value,10);
+  $('#runTour').disabled=true;
+  $('#tourNote').innerHTML=`<span class="spinner"></span> Simulando ${n.toLocaleString('es')} torneos…`;
+  setTimeout(()=>{
+    runSims(n);
+    renderTour();
+    $('#tourNote').textContent=`Listo · ${n.toLocaleString('es')} simulaciones completadas.`;
+    $('#runTour').disabled=false;
+  },40);
+});
+
+/* ---- VENUES & TIMELINE ---- */
+const VENUES=[
+  ['🇺🇸 Nueva York / Nueva Jersey','MetLife Stadium','East Rutherford, NJ · FINAL (19 jul)'],
+  ['🇲🇽 Ciudad de México','Estadio Azteca','CDMX · Partido inaugural (11 jun)'],
+  ['🇺🇸 Los Ángeles','SoFi Stadium','Inglewood, CA'],
+  ['🇺🇸 Dallas','AT&T Stadium','Arlington, TX'],
+  ['🇺🇸 Atlanta','Mercedes-Benz Stadium','Atlanta, GA'],
+  ['🇺🇸 Miami','Hard Rock Stadium','Miami Gardens, FL'],
+  ['🇺🇸 Seattle','Lumen Field','Seattle, WA'],
+  ['🇺🇸 San Francisco','Levi’s Stadium','Santa Clara, CA'],
+  ['🇺🇸 Filadelfia','Lincoln Financial Field','Filadelfia, PA'],
+  ['🇺🇸 Houston','NRG Stadium','Houston, TX'],
+  ['🇺🇸 Kansas City','Arrowhead Stadium','Kansas City, MO'],
+  ['🇺🇸 Boston','Gillette Stadium','Foxborough, MA'],
+  ['🇨🇦 Toronto','BMO Field','Toronto, ON'],
+  ['🇨🇦 Vancouver','BC Place','Vancouver, BC'],
+  ['🇲🇽 Guadalajara','Estadio Akron','Zapopan, JAL'],
+  ['🇲🇽 Monterrey','Estadio BBVA','Guadalupe, NL'],
+];
+$('#venueList').innerHTML=VENUES.map(v=>`<div class="venue">
+  <div class="city">${v[0]}</div>
+  <div class="stad">${v[1]}</div><div class="cty">${v[2]}</div></div>`).join('');
+
+const TIMELINE=[
+  ['11 jun 2026','Partido inaugural','México 🇲🇽 vs Sudáfrica 🇿🇦 · Estadio Azteca, CDMX'],
+  ['11–27 jun','Fase de grupos','72 partidos · Jornadas 1, 2 y 3 de los 12 grupos'],
+  ['28 jun – 3 jul','Dieciseisavos de final','Ronda de 32 · primera eliminatoria del nuevo formato'],
+  ['4 – 7 jul','Octavos de final','Ronda de 16'],
+  ['9 – 11 jul','Cuartos de final','Los 8 mejores'],
+  ['14 – 15 jul','Semifinales','Los 4 mejores'],
+  ['18 jul','Tercer puesto','Partido por la medalla de bronce'],
+  ['19 jul 2026','FINAL','MetLife Stadium · Nueva York / Nueva Jersey'],
+];
+$('#timeline').innerHTML=TIMELINE.map(t=>`<div class="tl"><div class="date">${t[0]}</div>
+  <div class="ev">${t[1]}<small>${t[2]}</small></div></div>`).join('');
+
+/* ============================================================
+   INIT
+   ============================================================ */
+renderMatches();
+renderGroups();
+syncFlags();
+runSimulator();
+// background group sim so advancement % appear shortly after load
+setTimeout(()=>{ runGroupSims(2500); renderGroups(); },60);
+</script>
+</body>
+</html>
