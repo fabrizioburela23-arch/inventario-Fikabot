@@ -797,12 +797,15 @@ function openPlayer(en,idx){const t=TEAMS[en],p=t.players[idx];if(!p)return;cons
       ${stat('Club',p.club||'—')}${stat('Liga',p.league||'—')}${stat('Edad',p.age?p.age+' años':'—')}
       ${stat('Partidos int.',p.intl_caps||0)}${stat('Goles int.',p.intl_goals||0)}
       ${stat('Mundiales',(p.wc_appearances||0)+(p.wc_goals?' · '+p.wc_goals+'g':''))}
-      ${p.rating_2526?stat('Valoración','★ '+p.rating_2526):stat('Lugar en plantel','#'+rank+' de '+t.players.length)}</div>
+      ${p.rating_2526?stat('Valoración','★ '+p.rating_2526):stat('Lugar en plantel','#'+rank+' de '+t.players.length)}
+      ${p.dob?stat('Nacimiento',p.dob):''}${p.club_goals_2526?stat('Goles club 25/26',p.club_goals_2526):''}${p.club_assists_2526?stat('Asist. club 25/26',p.club_assists_2526):''}</div>
     ${liveGoals(en,idx)?`<div style="margin-top:10px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:10px;padding:9px 12px;font-size:12.5px;color:#86efac">⚽ <b>${liveGoals(en,idx)}</b> gol(es) cargado(s) en este Mundial.</div>`:''}
     <h3 style="font-size:13px;margin:16px 0 6px">📋 Análisis del jugador</h3>
     <p style="font-size:13.5px;color:#cbd5e1;line-height:1.6">${playerAnalysis(en,p,idx)}</p>
     <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn sm ${LIVEINJ[injKey(en,idx)]?'ghost':''}" onclick="toggleInj('${en}',${idx})">${LIVEINJ[injKey(en,idx)]?'✅ Quitar lesión (en vivo)':'🩹 Marcar lesión (en vivo)'}</button>
+      <button class="btn ghost sm" onclick="playerSearch('${en}',${idx},'tm')">🔎 Perfil (Transfermarkt)</button>
+      <button class="btn ghost sm" onclick="playerSearch('${en}',${idx},'g')">🌐 Buscar</button>
       <button class="btn ghost sm" onclick="closeModal()">Cerrar</button></div>
     <div style="font-size:11px;color:var(--mut2);margin-top:8px">Marcar una lesión en vivo penaliza el índice del equipo en todas las predicciones.</div></div>`);}
 function toggleInj(en,idx){const k=injKey(en,idx);if(LIVEINJ[k])delete LIVEINJ[k];else LIVEINJ[k]=1;saveInj();openPlayer(en,idx);renderDash();renderMatches();renderPredModel();if(LASTTEAM)showTeam(LASTTEAM);}
@@ -847,6 +850,22 @@ async function syncSportsDB(){const id=(document.getElementById('sdbId').value||
     saveLive();renderMatches();reGroup();renderDash();
     out.innerHTML=ok?`✅ ${ok} resultado(s) sincronizado(s).`:'Conectó, pero aún no hay partidos finalizados para esa liga/temporada.';
   }catch(e){out.innerHTML='⚠️ No se pudo conectar (posible bloqueo CORS o liga/temporada inexistente). Usa la carga manual de arriba, que siempre funciona.';}}
+/* designaciones de árbitros ya confirmadas por la FIFA (jornada inaugural) */
+const REF_PRESET=[['A__Mexico__South Africa','Wilton Sampaio'],['A__South Korea__Czech Republic','Amin Mohamed Omar'],['B__Canada__Bosnia-Herzegovina','Facundo Tello'],['D__USA__Paraguay','Danny Makkelie']];
+function refIndexByName(n){return REFS.findIndex(r=>r.name===n);}
+function applyRefPresets(){let ch=false;REF_PRESET.forEach(([k,n])=>{if(MATCHREF[k]==null){const i=refIndexByName(n);if(i>=0){MATCHREF[k]=i;ch=true;}}});if(ch)saveRef();}
+function playerSearch(en,idx,where){const p=TEAMS[en].players[idx];if(!p)return;
+  const url=where==='tm'?'https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query='+encodeURIComponent(p.name):'https://www.google.com/search?q='+encodeURIComponent(p.name+' '+(p.club||'')+' footballer');
+  window.open(url,'_blank');}
+async function internetUpdate(){const out=document.getElementById('netStatus');if(out)out.innerHTML='<span class="spinner"></span> Buscando en internet…';
+  const id=(document.getElementById('netId')&&document.getElementById('netId').value)||'4429';const url='https://www.thesportsdb.com/api/v1/json/3/eventsseason.php?id='+id+'&s=2026';
+  let evs=null;
+  try{const r=await fetch(url);const d=await r.json();evs=(d&&d.events)||[];}catch(e){evs=null;}
+  if(evs===null){try{const r=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url));const d=await r.json();evs=(d&&d.events)||[];}catch(e){evs=null;}}
+  if(evs===null){if(out)out.innerHTML='⚠️ El navegador bloqueó el acceso a internet (CORS) y el proxy no respondió. Usa la carga manual o el botón 🔎 Buscar de cada partido.';return;}
+  let ok=0;evs.forEach(ev=>{if(ev.intHomeScore==null||ev.intAwayScore==null)return;const ta=resolveTeam(ev.strHomeTeam),tb=resolveTeam(ev.strAwayTeam);if(!ta||!tb)return;const mt=findMatch(ta,tb);if(!mt)return;let ga=+ev.intHomeScore,gb=+ev.intAwayScore;if(mt.a!==ta){const z=ga;ga=gb;gb=z;}LIVE[mt.key]={ga,gb};ok++;});
+  saveLive();renderMatches();reGroup();renderDash();
+  if(out)out.innerHTML=ok?('✅ '+ok+' resultado(s) traído(s) de internet.'):'Conectó a internet, pero aún no hay partidos finalizados publicados para esta liga/temporada.';}
 function openLiveData(){openModal(`<div class="pmodal">
   <h3 style="font-size:17px;margin-bottom:4px">🔄 Actualizar con lo que pasa en el Mundial</h3>
   <p style="font-size:12.5px;color:var(--mut)">Carga resultados reales y la app recalcula grupos y título. Las <b>lesiones</b> se marcan desde la ficha de cada jugador (Equipos → toca un jugador).</p>
@@ -855,10 +874,9 @@ function openLiveData(){openModal(`<div class="pmodal">
   <textarea id="manualRes" style="width:100%;height:88px;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:9px;font-family:inherit;font-size:13px" placeholder="México 2-1 Sudáfrica
 España 3-0 Cabo Verde"></textarea>
   <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center"><button class="btn sm" onclick="applyManual()">Aplicar resultados</button><span id="manualStatus" class="simnote"></span></div>
-  <h3 style="font-size:13px;margin:16px 0 6px">📡 Sincronización automática (experimental)</h3>
-  <p style="font-size:12px;color:var(--mut2)">Intenta traer resultados finalizados de TheSportsDB. Puede no estar disponible según cobertura o navegador (CORS).</p>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="text" id="sdbId" value="4429" style="width:90px" title="ID de liga"><input type="text" id="sdbSeason" value="2026" style="width:80px" title="Temporada">
-    <button class="btn sm ghost" onclick="syncSportsDB()">Sincronizar</button><span id="sdbStatus" class="simnote"></span></div>
+  <h3 style="font-size:13px;margin:16px 0 6px">🌐 Buscar y actualizar desde internet</h3>
+  <p style="font-size:12px;color:var(--mut2)">Intenta traer los resultados finalizados desde internet (TheSportsDB, con proxy de respaldo). Puede no encontrar datos si la fuente aún no los publica o si el navegador bloquea la conexión.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn sm" onclick="internetUpdate()">🌐 Buscar y actualizar ahora</button><input type="text" id="netId" value="4429" style="width:80px" title="ID de liga en TheSportsDB"><span id="netStatus" class="simnote"></span></div>
   <div style="margin-top:16px;text-align:right"><button class="btn ghost sm" onclick="closeModal()">Cerrar</button></div></div>`);}
 
 /* ===== EDITOR POR PARTIDO (marcador, goleadores, estado, notas, búsqueda web) ===== */
@@ -920,7 +938,7 @@ function openMatch(key){const m=MATCHES.find(x=>x.key===key);if(!m)return;const 
     <div style="font-size:11px;color:var(--mut2);margin-top:8px">Todo se guarda en tu navegador y recalcula grupos, título y fichas de jugador al instante.</div></div>`);}
 
 /* ===== INIT ===== */
-renderDash();renderMatches();renderGroups();renderTeamGrid('');syncF();runSim();renderPredModel();renderRefs();
+applyRefPresets();renderDash();renderMatches();renderGroups();renderTeamGrid('');syncF();runSim();renderPredModel();renderRefs();
 setTimeout(()=>{runGroupSim(2000);renderGroups();},60);
 </script>
 </body>
