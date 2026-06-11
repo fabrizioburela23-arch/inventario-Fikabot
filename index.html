@@ -344,9 +344,23 @@
       <div class="card">
         <h3 style="font-size:15px;margin-bottom:6px">🎲 Simulación Montecarlo del torneo</h3>
         <div class="toolbar"><button class="btn sm" id="runTour">Simular torneo</button>
-          <select id="nSims"><option value="2000">2.000</option><option value="5000" selected>5.000</option><option value="10000">10.000</option></select>
+          <select id="nSims"><option value="2000">2.000</option><option value="5000" selected>5.000</option><option value="10000">10.000</option><option value="25000">25.000</option><option value="50000">50.000 (preciso)</option></select>
           <span class="simnote" id="tourNote">Pulsa para calcular.</span></div>
         <div class="rank" id="tourOut" style="margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="grid" style="margin-top:14px">
+      <div class="card"><h3 style="font-size:15px;margin-bottom:6px">🗺️ Treemap de probabilidades de título</h3>
+        <p style="font-size:12px;color:var(--mut2);margin-bottom:8px">Cada selección ocupa un área proporcional a su probabilidad: los fuertes se extienden, los pequeños se reducen.</p>
+        <div id="vizTreemap"></div></div>
+      <div class="card"><h3 style="font-size:15px;margin-bottom:6px">🌍 Mapa mundial · probabilidad de campeón</h3>
+        <p style="font-size:12px;color:var(--mut2);margin-bottom:8px">Cada país crece y se ilumina según sus opciones de levantar la copa.</p>
+        <div id="vizMap"></div></div>
+      <div class="two" style="margin-top:0">
+        <div class="card"><h3 style="font-size:15px;margin-bottom:8px">🕸️ Radar de fortalezas (11 dimensiones)</h3>
+          <select id="vizRadarSel" style="width:100%;margin-bottom:8px"></select><div id="vizRadar"></div></div>
+        <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px"><h3 style="font-size:15px">🏆 Bracket de ejemplo</h3><button class="btn ghost sm" id="newBracket">↻ Otra simulación</button></div>
+          <div id="vizBracket"></div></div>
       </div>
     </div>
   </section>
@@ -581,14 +595,14 @@ function playGroups(){const st={};ENS.forEach(e=>st[e]={p:0,gf:0,ga:0});
   return st;}
 function seedOrder(n){let p=[1,2];while(p.length<n){const s=p.length*2+1,o=[];for(const x of p){o.push(x);o.push(s-x);}p=o;}return p;}
 const SEED32=seedOrder(32);
-function simTournament(){const st=playGroups();const rf=rankFn(st);
+function simTournament(cap){const st=playGroups();const rf=rankFn(st);
   const win=[],run=[],thr=[];GROUPS.forEach(g=>{const ts=inGroup(g).slice().sort(rf);win.push(ts[0]);run.push(ts[1]);thr.push(ts[2]);});
   thr.sort(rf);const q=[...win,...run,...thr.slice(0,8)].sort((x,y)=>C(y)-C(x));
-  let br=SEED32.map(s=>q[s-1]);const reach={sf:[],fn:[]};
-  function round(arr,store){const nx=[];for(let i=0;i<arr.length;i+=2){const A=arr[i],B=arr[i+1];let[ga,gb]=simGoals(C(A),C(B),0,0);let w;
-    if(ga>gb)w=A;else if(gb>ga)w=B;else{const e=1/(1+Math.pow(10,(C(B)-C(A))*0.55));w=Math.random()<e?A:B;}nx.push(w);if(store)store.push(w);}return nx;}
-  let r=round(br);r=round(r);r=round(r,reach.sf);r=round(r,reach.fn);const champ=round(r)[0];
-  return{q,win,sf:reach.sf,fn:reach.fn,champ};}
+  let br=SEED32.map(s=>q[s-1]);const reach={sf:[],fn:[]};const tree=[];
+  function round(arr,store){const nx=[],pairs=[];for(let i=0;i<arr.length;i+=2){const A=arr[i],B=arr[i+1];let[ga,gb]=simGoals(C(A),C(B),0,0);let w,pen=false;
+    if(ga>gb)w=A;else if(gb>ga)w=B;else{const e=1/(1+Math.pow(10,(C(B)-C(A))*0.55));w=Math.random()<e?A:B;pen=true;}nx.push(w);if(store)store.push(w);if(cap)pairs.push({a:A,b:B,ga,gb,w,pen});}if(cap)tree.push(pairs);return nx;}
+  const r16=round(br),qf=round(r16);let r=round(qf,reach.sf);r=round(r,reach.fn);const champ=round(r)[0];
+  return{q,win,r16,qf,sf:reach.sf,fn:reach.fn,champ,tree:cap?tree:null};}
 
 let GSIM=null,TSIM=null;
 function runGroupSim(n){const gpos={},adv={},gw={};ENS.forEach(e=>{gpos[e]={1:0,2:0,3:0,4:0};adv[e]=0;gw[e]=0;});
@@ -597,9 +611,13 @@ function runGroupSim(n){const gpos={},adv={},gw={};ENS.forEach(e=>{gpos[e]={1:0,
     thr.sort((x,y)=>{if(y.s.p!==x.s.p)return y.s.p-x.s.p;if((y.s.gf-y.s.ga)!==(x.s.gf-x.s.ga))return (y.s.gf-y.s.ga)-(x.s.gf-x.s.ga);if(y.s.gf!==x.s.gf)return y.s.gf-x.s.gf;return Math.random()-.5;});
     thr.slice(0,8).forEach(o=>adv[o.e]++);}
   GSIM={n,gpos,adv,gw};return GSIM;}
-function runTourSim(n){const champ={},fin={},sf={},adv={};ENS.forEach(e=>{champ[e]=0;fin[e]=0;sf[e]=0;adv[e]=0;});
-  for(let s=0;s<n;s++){const r=simTournament();r.q.forEach(e=>adv[e]++);r.sf.forEach(e=>sf[e]++);r.fn.forEach(e=>fin[e]++);champ[r.champ]++;}
-  TSIM={n,champ,fin,sf,adv};return TSIM;}
+function runTourSim(n){const champ={},fin={},sf={},qf={},r16={},adv={};ENS.forEach(e=>{champ[e]=0;fin[e]=0;sf[e]=0;qf[e]=0;r16[e]=0;adv[e]=0;});
+  for(let s=0;s<n;s++){const r=simTournament();r.q.forEach(e=>adv[e]++);r.r16.forEach(e=>r16[e]++);r.qf.forEach(e=>qf[e]++);r.sf.forEach(e=>sf[e]++);r.fn.forEach(e=>fin[e]++);champ[r.champ]++;}
+  TSIM={n,champ,fin,sf,qf,r16,adv};return TSIM;}
+function runTourSimAsync(n,onP,onDone){const champ={},fin={},sf={},qf={},r16={},adv={};ENS.forEach(e=>{champ[e]=0;fin[e]=0;sf[e]=0;qf[e]=0;r16[e]=0;adv[e]=0;});
+  let done=0;const batch=Math.max(400,Math.floor(n/50));
+  (function step(){const end=Math.min(n,done+batch);for(;done<end;done++){const r=simTournament();r.q.forEach(e=>adv[e]++);r.r16.forEach(e=>r16[e]++);r.qf.forEach(e=>qf[e]++);r.sf.forEach(e=>sf[e]++);r.fn.forEach(e=>fin[e]++);champ[r.champ]++;}
+    onP&&onP(done/n);if(done<n)setTimeout(step,0);else{TSIM={n,champ,fin,sf,qf,r16,adv};onDone&&onDone();}})();}
 
 /* ===== helpers ===== */
 const $=s=>document.querySelector(s);
@@ -748,7 +766,7 @@ fillSel($('#simA'),'Argentina');fillSel($('#simB'),'France');
 function syncF(){$('#simFlagA').textContent=TEAMS[$('#simA').value].flag;$('#simFlagB').textContent=TEAMS[$('#simB').value].flag;}
 $('#simA').addEventListener('change',syncF);$('#simB').addEventListener('change',syncF);
 function runSim(){const a=$('#simA').value,b=$('#simB').value;if(a===b){$('#simOut').innerHTML='<div style="text-align:center;color:var(--amber);padding:14px">Elige dos selecciones distintas.</div>';return;}
-  const A=TEAMS[a],B=TEAMS[b];const host=$('#simHost').checked;const pr=predict(C(a),C(b),host&&A.host,host&&B.host);
+  const A=TEAMS[a],B=TEAMS[b];const host=$('#simHost').checked;const pr=predict(C(a),C(b),host&&A.host,host&&B.host);const ss=scorelineStats(pr.la,pr.lb);
   $('#simOut').innerHTML=`<div class="bar" style="height:16px"><span class="bw" style="width:${pr.w*100}%"></span><span class="bd" style="width:${pr.dr*100}%"></span><span class="bl" style="width:${pr.l*100}%"></span></div>
     <div class="donut"><div class="stat"><div class="big" style="color:var(--teal)">${pct(pr.w)}%</div><div class="lab">Gana ${A.es}</div></div>
       <div class="stat"><div class="big" style="color:var(--mut)">${pct(pr.dr)}%</div><div class="lab">Empate</div></div>
@@ -756,7 +774,10 @@ function runSim(){const a=$('#simA').value,b=$('#simB').value;if(a===b){$('#simO
     <div class="kvs"><div class="kv"><div class="k">Marcador probable</div><div class="v">${A.flag} ${pr.scA} - ${pr.scB} ${B.flag}</div></div>
       <div class="kv"><div class="k">Goles esperados</div><div class="v">${pr.la.toFixed(2)} vs ${pr.lb.toFixed(2)}</div></div>
       <div class="kv"><div class="k">Índices</div><div class="v">${A.comp.toFixed(2)} vs ${B.comp.toFixed(2)}</div></div>
-      <div class="kv"><div class="k">IPP</div><div class="v">${A.ipp} vs ${B.ipp}</div></div></div>`;}
+      <div class="kv"><div class="k">IPP</div><div class="v">${A.ipp} vs ${B.ipp}</div></div></div>
+    <h3 style="font-size:13px;margin:16px 0 6px">🎯 Marcadores más probables</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${ss.top.map(s=>`<div style="background:rgba(24,27,33,.6);border:1px solid var(--line);border-radius:10px;padding:7px 11px;text-align:center;min-width:54px"><div style="font-weight:800;font-size:15px">${s.i}-${s.j}</div><div style="font-size:11px;color:var(--mut)">${(s.pr*100).toFixed(1)}%</div></div>`).join('')}</div>
+    <div class="kvs" style="margin-top:10px"><div class="kv"><div class="k">Más de 2.5 goles</div><div class="v">${pct(ss.over)}%</div></div><div class="kv"><div class="k">Menos de 2.5</div><div class="v">${pct(1-ss.over)}%</div></div><div class="kv"><div class="k">Ambos marcan</div><div class="v">${pct(ss.btts)}%</div></div><div class="kv"><div class="k">Si fuese eliminatoria · pasa ${A.es}</div><div class="v">${pct(pr.w+pr.dr*(1/(1+Math.pow(10,(C(b)-C(a))*0.55))))}%</div></div></div>`;}
 $('#simBtn').addEventListener('click',runSim);$('#simHost').addEventListener('change',runSim);
 
 /* ===== PREDICTION ===== */
@@ -765,12 +786,12 @@ function renderPredModel(){const top=ENS.slice().sort((a,b)=>TEAMS[b].win-TEAMS[
     <div class="rhead"><div class="nm"><span class="flag">${t.flag}</span><span class="tn">${t.es}</span> ${tierBadge(t.tier)}</div><div class="pct">${pct1(t.win/100)}%</div></div>
     <div class="rbar"><i style="width:${Math.max(3,t.win/mx*100)}%"></i></div></div></div>`;}).join('');}
 function renderTour(){if(!TSIM){$('#tourOut').innerHTML='';return;}const n=TSIM.n;const ord=ENS.slice().sort((a,b)=>TSIM.champ[b]-TSIM.champ[a]).slice(0,16);const mx=TSIM.champ[ord[0]]/n||1;
-  $('#tourOut').innerHTML=ord.map((e,i)=>{const t=TEAMS[e];const c=TSIM.champ[e]/n;return `<div class="rline" onclick="goTeam('${e}')"><div class="rpos">${i+1}</div><div>
-    <div class="rhead"><div class="nm"><span class="flag">${t.flag}</span><span class="tn">${t.es}</span></div><div class="pct">${pct1(c)}%</div></div>
+  $('#tourOut').innerHTML=ord.map((e,i)=>{const t=TEAMS[e];const c=TSIM.champ[e]/n;const e95=ci(c,n);return `<div class="rline" onclick="showPath('${e}')"><div class="rpos">${i+1}</div><div>
+    <div class="rhead"><div class="nm"><span class="flag">${t.flag}</span><span class="tn">${t.es}</span></div><div class="pct">${pct1(c)}%<span style="font-size:9.5px;color:var(--mut2);font-weight:400"> ±${(e95*100).toFixed(1)}</span></div></div>
     <div class="rbar"><i style="width:${Math.max(3,c/mx*100)}%"></i></div>
-    <div class="rmeta"><span>🥇 Final ${pct(TSIM.fin[e]/n)}%</span><span>🎖️ Semis ${pct(TSIM.sf[e]/n)}%</span><span>✅ Avanza ${pct(TSIM.adv[e]/n)}%</span></div></div></div>`;}).join('');}
-$('#runTour').addEventListener('click',()=>{const n=parseInt($('#nSims').value,10);$('#runTour').disabled=true;$('#tourNote').innerHTML=`<span class="spinner"></span> Simulando ${n.toLocaleString('es')}…`;
-  setTimeout(()=>{runTourSim(n);renderTour();$('#tourNote').textContent=`Listo · ${n.toLocaleString('es')} simulaciones${Object.keys(LIVE).length?' (con resultados en vivo)':''}.`;$('#runTour').disabled=false;},40);});
+    <div class="rmeta"><span>🥇 Final ${pct(TSIM.fin[e]/n)}%</span><span>🎖️ Semis ${pct(TSIM.sf[e]/n)}%</span><span>🏟️ Cuartos ${pct(TSIM.qf[e]/n)}%</span><span>✅ Avanza ${pct(TSIM.adv[e]/n)}%</span></div></div></div>`;}).join('');}
+$('#runTour').addEventListener('click',()=>{const n=parseInt($('#nSims').value,10);$('#runTour').disabled=true;$('#tourNote').innerHTML=`<span class="spinner"></span> Simulando 0%…`;
+  runTourSimAsync(n,p=>{$('#tourNote').innerHTML=`<span class="spinner"></span> Simulando ${Math.round(p*100)}%…`;},()=>{renderTour();renderAllViz();$('#tourNote').textContent=`Listo · ${n.toLocaleString('es')} simulaciones${Object.keys(LIVE).length?' (con resultados en vivo)':''}.`;$('#runTour').disabled=false;});});
 
 /* ===== REFEREES ===== */
 const REFS=RAW.referees;
@@ -843,7 +864,8 @@ function openModal(html){$('#modalBody').innerHTML=html;$('#modal').classList.ad
 function closeModal(){$('#modal').classList.remove('open');}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 
-function openPlayer(en,idx){const t=TEAMS[en],p=t.players[idx];if(!p)return;const inf=influence(p),inj=isInj(en,idx,p);
+function openPlayer(en,idx){const t=TEAMS[en],p=t.players[idx];if(!p)return;window.__curP={en,idx};const inf=influence(p),inj=isInj(en,idx,p);
+  const at=playerAttrs(p),cmpAt=CMP?playerAttrs(TEAMS[CMP.en].players[CMP.idx]):null;let cmpOpts=playerOptions();if(CMP){const sv=CMP.en+'|'+CMP.idx;cmpOpts=cmpOpts.replace('value="'+sv+'">','value="'+sv+'" selected>');}
   const ranked=t.players.map((q,i)=>({i,v:influence(q)})).sort((a,b)=>b.v-a.v);const rank=ranked.findIndex(o=>o.i===idx)+1;const rl=roleLabel(inf,inj);
   const stat=(k,v)=>`<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`;
   openModal(`<div class="pmodal">
@@ -864,6 +886,10 @@ function openPlayer(en,idx){const t=TEAMS[en],p=t.players[idx];if(!p)return;cons
     ${p.narrative?`<div style="margin-top:12px;background:linear-gradient(135deg,rgba(20,184,166,.08),rgba(236,72,153,.08));border:1px solid var(--line);border-radius:12px;padding:12px 14px"><div style="font-size:11px;color:var(--teal);font-weight:700;margin-bottom:4px">⭐ PERFIL</div><div style="font-size:13.5px;color:#e9eef7;line-height:1.6">${p.narrative}</div></div>`:''}
     ${p.career_stats?`<h3 style="font-size:13px;margin:16px 0 6px">🏆 Estadísticas de carrera</h3><div class="kvs">${careerStats(p.career_stats)}</div>`:''}
     ${(p.advanced_metrics||p.yellow_cards!=null||p.mins_played)?`<h3 style="font-size:13px;margin:16px 0 6px">📈 Temporada 2025/26 (avanzado)</h3><div class="kvs">${advStats(p)}</div>`:''}
+    <h3 style="font-size:13px;margin:16px 0 6px">🕸️ Atributos del jugador</h3>
+    <select onchange="setCmp(this.value)" style="width:100%;margin-bottom:6px">${cmpOpts}</select>
+    ${radarSVG(at.labels,[{values:at.values,color:'#00e5ee'}].concat(cmpAt?[{values:cmpAt.values,color:'#ff6a5a'}]:[]),300)}
+    ${cmpAt?`<div style="text-align:center;font-size:11.5px;color:var(--mut);margin-top:2px"><span style="color:#00e5ee">●</span> ${p.name} &nbsp; <span style="color:#ff6a5a">●</span> ${TEAMS[CMP.en].players[CMP.idx].name}</div>`:''}
     <h3 style="font-size:13px;margin:16px 0 6px">🤖 Análisis del modelo</h3>
     <p style="font-size:13.5px;color:#cbd5e1;line-height:1.6">${playerAnalysis(en,p,idx)}</p>
     <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
@@ -981,6 +1007,10 @@ function openMatch(key){const m=MATCHES.find(x=>x.key===key);if(!m)return;const 
       <input type="number" min="0" max="30" id="emA" value="${lv?lv.ga:''}" style="width:62px;text-align:center;font-size:19px" onchange="setMatchScore('${key}')">
       <span style="color:var(--mut2);font-weight:800">-</span>
       <input type="number" min="0" max="30" id="emB" value="${lv?lv.gb:''}" style="width:62px;text-align:center;font-size:19px" onchange="setMatchScore('${key}')"></div>
+    <div style="display:flex;justify-content:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn ghost sm" onclick="forceRes('${key}',1,0)">Gana ${A.es} (1-0)</button>
+      <button class="btn ghost sm" onclick="forceRes('${key}',1,1)">Empate (1-1)</button>
+      <button class="btn ghost sm" onclick="forceRes('${key}',0,1)">Gana ${B.es} (0-1)</button></div>
     ${m.s?`<div style="text-align:center;font-size:11.5px;color:var(--mut);margin-top:8px">📅 ${fmtDate(m.s.date)}${m.s.kick_off?' · '+m.s.kick_off:''}${m.s.venue?' · '+m.s.venue:''}${m.s.match_id?' · '+m.s.match_id:''}</div>`:''}
     ${m.s&&m.s.officials?`<div style="margin-top:10px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:11.5px;color:var(--mut);line-height:1.5"><b style="color:var(--txt)">Cuerpo arbitral:</b> 🧑‍⚖️ ${m.s.officials.referee||'—'}${m.s.officials.assistant_referee_1?' · 🚩 '+m.s.officials.assistant_referee_1:''}${m.s.officials.assistant_referee_2?', '+m.s.officials.assistant_referee_2:''}${m.s.officials.fourth_official?' · 4️⃣ '+m.s.officials.fourth_official:''}${m.s.officials.var?' · 📺 VAR '+m.s.officials.var:''}</div>`:''}
     <div style="display:flex;justify-content:center;gap:8px;margin-top:10px;align-items:center">
@@ -1018,8 +1048,104 @@ function renderHistorias(){const tn=RAW.tournament_narratives;if(!tn){$('#histLi
   if(tn.political_context){html+=card('🌐 Contexto político y social',(tn.political_context||[]).map(c=>`<div style="font-size:12.5px;color:#cbd5e1;margin-top:5px">• ${c}</div>`).join(''));}
   $('#histList').innerHTML=html;}
 
+/* ===== VISUALIZACIONES · PERFILES · ESCENARIOS (SVG puro) ===== */
+function ci(p,n){return n?1.96*Math.sqrt(p*(1-p)/n):0;}
+function heat(t){t=Math.max(0,Math.min(1,t));const a=[10,107,255],b=[0,229,238],c=a.map((x,i)=>Math.round(x+(b[i]-x)*t));return `rgb(${c[0]},${c[1]},${c[2]})`;}
+
+/* ---- radar svg ---- */
+function radarSVG(labels,datasets,size){size=size||300;const cx=size/2,cy=size/2,R=size/2-40,N=labels.length;
+  const ang=i=>-Math.PI/2+i*2*Math.PI/N,pt=(i,v)=>[cx+R*v*Math.cos(ang(i)),cy+R*v*Math.sin(ang(i))];
+  let s=`<svg viewBox="0 0 ${size} ${size}" width="100%" style="max-width:340px;display:block;margin:0 auto">`;
+  [0.25,0.5,0.75,1].forEach(r=>{s+=`<polygon points="${labels.map((_,i)=>pt(i,r).join(',')).join(' ')}" fill="none" stroke="rgba(140,150,170,.16)"/>`;});
+  labels.forEach((_,i)=>{const[x,y]=pt(i,1);s+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(140,150,170,.13)"/>`;});
+  datasets.forEach(d=>{s+=`<polygon points="${d.values.map((v,i)=>pt(i,Math.max(0,Math.min(1,v))).join(',')).join(' ')}" fill="${d.color}33" stroke="${d.color}" stroke-width="2"/>`;});
+  labels.forEach((lab,i)=>{const[x,y]=pt(i,1.16);s+=`<text x="${x}" y="${y}" font-size="9.5" fill="#b9bed0" text-anchor="middle" dominant-baseline="middle">${lab}</text>`;});
+  return s+'</svg>';}
+
+/* ---- player attributes + comparador ---- */
+function playerAttrs(p){const g=posGroup(p.position),am=p.advanced_metrics||{};
+  const ig=p.intl_goals||0,caps=p.intl_caps||0,gpc=caps?ig/caps:0;const cl=v=>Math.max(.08,Math.min(1,v));
+  const base={GK:[.12,.18,.12,.62,.5,.82],DF:[.3,.4,.28,.7,.55,.7],MF:[.55,.7,.62,.65,.55,.7],FW:[.82,.62,.66,.6,.5,.66]}[g]||[.5,.5,.5,.6,.5,.72];
+  return {labels:['Ataque','Definición','Creación','Físico','Experiencia','Disciplina'],overall:influence(p),
+    values:[cl(base[0]+gpc*1.0+(am.goals_per_90||0)*.18),
+            cl(base[1]+(am.career_conversion_rate?Math.min(am.career_conversion_rate,25)/25*.32:0)+Math.min(ig,40)/40*.22),
+            cl(base[2]+(p.key_passes?Math.min(p.key_passes,100)/100*.3:0)+(am.assists_per_90||0)*.22+(p.dribbles_completed?Math.min(p.dribbles_completed,80)/80*.16:0)),
+            cl(base[3]+(p.mins_played?Math.min(p.mins_played,3000)/3000*.2:0)-(p.age&&p.age>33?(p.age-33)*.04:0)),
+            cl(Math.min(caps,120)/120*.62+Math.min(p.wc_appearances||0,12)/12*.28+(p.age>=28?.12:0)),
+            cl((p.yellow_cards!=null)?(0.92-(p.yellow_cards*0.045+(p.red_cards||0)*0.16)):0.74)]};}
+let CMP=null,PLAYER_OPTIONS='';
+function playerOptions(){if(PLAYER_OPTIONS)return PLAYER_OPTIONS;let o='<option value="">— comparar con… —</option>';
+  ENS.slice().sort((a,b)=>TEAMS[a].es.localeCompare(TEAMS[b].es)).forEach(en=>TEAMS[en].players.forEach((p,i)=>{o+=`<option value="${en}|${i}">${TEAMS[en].flag} ${p.name} · ${TEAMS[en].es}</option>`;}));
+  PLAYER_OPTIONS=o;return o;}
+function setCmp(v){CMP=v?{en:v.split('|')[0],idx:+v.split('|')[1]}:null;if(window.__curP)openPlayer(window.__curP.en,window.__curP.idx);}
+
+/* ---- treemap ---- */
+function squarify(values,x,y,w,h){const total=values.reduce((s,d)=>s+d.v,0)||1;const items=values.map(d=>Object.assign({},d,{area:d.v/total*(w*h)}));const out=[];let rx=x,ry=y,rw=w,rh=h;
+  function worst(row,len){const s=row.reduce((a,b)=>a+b.area,0),mx=Math.max(...row.map(r=>r.area)),mn=Math.min(...row.map(r=>r.area));return Math.max(len*len*mx/(s*s),s*s/(len*len*mn));}
+  while(items.length){const len=Math.min(rw,rh);let row=[];while(items.length){const nx=items[0];if(row.length===0||worst(row.concat([nx]),len)<=worst(row,len))row.push(items.shift());else break;}
+    const ra=row.reduce((a,b)=>a+b.area,0);
+    if(rw<=rh){const sh=ra/rw;let cx=rx;row.forEach(d=>{const cw=d.area/sh;out.push(Object.assign({},d,{rx:cx,ry,rw:cw,rh:sh}));cx+=cw;});ry+=sh;rh-=sh;}
+    else{const sw=ra/rh;let cy=ry;row.forEach(d=>{const ch=d.area/sw;out.push(Object.assign({},d,{rx,ry:cy,rw:sw,rh:ch}));cy+=ch;});rx+=sw;rw-=sw;}}
+  return out;}
+function renderTreemap(){const host=$('#vizTreemap');if(!host)return;if(!TSIM){host.innerHTML='<div style="color:var(--mut);font-size:12.5px;padding:8px 0">Ejecuta una simulación para ver el treemap.</div>';return;}
+  const n=TSIM.n,arr=ENS.map(e=>({e,v:TSIM.champ[e]/n})).filter(d=>d.v>0).sort((a,b)=>b.v-a.v).slice(0,26);const W=100,H=56,mx=arr[0].v||1;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;border-radius:10px;overflow:hidden">`;
+  squarify(arr,0,0,W,H).forEach(d=>{const t=TEAMS[d.e],big=d.rw>9&&d.rh>7,col=heat(d.v/mx);
+    s+=`<rect x="${d.rx+.25}" y="${d.ry+.25}" width="${Math.max(0,d.rw-.5)}" height="${Math.max(0,d.rh-.5)}" rx="1" fill="${col}" fill-opacity="0.85" stroke="#0c0e12" stroke-width=".4"/>`;
+    if(big){s+=`<text x="${d.rx+d.rw/2}" y="${d.ry+d.rh/2-.5}" font-size="${Math.min(4.4,d.rw/3)}" text-anchor="middle" dominant-baseline="middle">${t.flag}</text>`;
+      s+=`<text x="${d.rx+d.rw/2}" y="${d.ry+d.rh/2+3}" font-size="2.2" text-anchor="middle" fill="#06121a" font-weight="700">${(d.v*100).toFixed(1)}%</text>`;}});
+  host.innerHTML=s+'</svg>';}
+
+/* ---- mapa mundial (burbujas geográficas) ---- */
+const LATLON={Spain:[40,-4],France:[47,2],England:[53,-1.5],Brazil:[-10,-52],Germany:[51,10],Argentina:[-35,-64],Portugal:[39.5,-8],Netherlands:[52,5],Belgium:[50.6,4.5],Colombia:[4,-73],Croatia:[45.1,16],Norway:[62,9],Morocco:[32,-6],Uruguay:[-33,-56],Ecuador:[-1.5,-78],USA:[39,-98],Senegal:[14.5,-14.5],Mexico:[23,-102],Japan:[36,138],Turkey:[39,35],Austria:[47.6,14.2],Sweden:[62,15],Egypt:[27,30],Switzerland:[46.8,8.2],Canada:[58,-100],Algeria:[28,2.6],'South Korea':[36.5,127.8],Australia:[-25,134],Scotland:[56.8,-4.2],Iran:[32,53],'Czech Republic':[49.8,15.5],Paraguay:[-23.4,-58],Tunisia:[34,9.5],'Ivory Coast':[7.5,-5.5],Qatar:[25.3,51.2],Ghana:[7.9,-1],'Saudi Arabia':[24,45],'Bosnia-Herzegovina':[44,17.8],'South Africa':[-29,24],Panama:[8.5,-80],Uzbekistan:[41.4,64.6],'DR Congo':[-3,23.6],Jordan:[31,36.2],Iraq:[33,43.7],'Cape Verde':[16,-24],'New Zealand':[-41,173],Haiti:[19,-72.3],Curacao:[12.2,-69]};
+function renderWorldMap(){const host=$('#vizMap');if(!host)return;if(!TSIM){host.innerHTML='<div style="color:var(--mut);font-size:12.5px;padding:8px 0">Ejecuta una simulación para ver el mapa.</div>';return;}
+  const n=TSIM.n,W=920,H=430,proj=(la,lo)=>[(lo+180)/360*W,(90-la)/180*H],mx=Math.max(...ENS.map(e=>TSIM.champ[e]/n))||1;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;border-radius:12px;background:radial-gradient(circle at 50% 42%,rgba(0,102,255,.07),transparent 70%)">`;
+  for(let lo=-150;lo<=180;lo+=30){const x=proj(0,lo)[0];s+=`<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="rgba(140,150,170,.08)"/>`;}
+  for(let la=-60;la<=80;la+=30){const y=proj(la,0)[1];s+=`<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="rgba(140,150,170,.08)"/>`;}
+  ENS.map(e=>({e,v:TSIM.champ[e]/n,a:TSIM.adv[e]/n})).sort((x,y)=>x.v-y.v).forEach(d=>{const ll=LATLON[d.e];if(!ll)return;const[x,y]=proj(ll[0],ll[1]);const r=7+Math.sqrt(d.v/mx)*30+d.a*5,col=heat(d.v/mx);
+    s+=`<circle cx="${x}" cy="${y}" r="${r}" fill="${col}" fill-opacity="${(0.16+0.5*(d.v/mx)).toFixed(2)}" stroke="${col}" stroke-width="1"/>`;
+    s+=`<text x="${x}" y="${y}" font-size="${Math.min(20,r*0.95).toFixed(1)}" text-anchor="middle" dominant-baseline="central">${TEAMS[d.e].flag}</text>`;});
+  host.innerHTML=s+'</svg>';}
+
+/* ---- radar de fortalezas por equipo (11 dim) ---- */
+const DIMSHORT={fifa_score:'FIFA',squad_quality:'Plantel',top_player_peak:'Figura',attack_power:'Ataque',defense_strength:'Defensa',experience:'Exp.',recent_form_score:'Forma',coach_quality:'DT',wc_history:'Historia',injury_risk:'Salud',age_balance:'Edad'};
+function renderTeamRadar(){const sel=$('#vizRadarSel'),host=$('#vizRadar');if(!host)return;const en=(sel&&sel.value)||'Spain';const d=TEAMS[en].pred.dimension_scores;
+  const ks=Object.keys(DIMSHORT);host.innerHTML=`<div style="text-align:center;font-weight:700;margin-bottom:2px">${TEAMS[en].flag} ${TEAMS[en].es}</div>`+radarSVG(ks.map(k=>DIMSHORT[k]),[{values:ks.map(k=>(d[k]||0)/10),color:'#00e5ee'}],300);}
+
+/* ---- bracket de ejemplo ---- */
+let SAMPLE=null;
+function renderBracket(){const host=$('#vizBracket');if(!host)return;if(!SAMPLE)SAMPLE=simTournament(true);const tree=SAMPLE.tree;if(!tree){host.innerHTML='';return;}
+  const names=['','Octavos','Cuartos','Semis','Final'];let cols='';
+  for(let r=1;r<tree.length;r++){const cells=tree[r].map(m=>{const row=en=>{const gf=en===m.a?m.ga:m.gb,win=m.w===en;return `<div style="display:flex;justify-content:space-between;gap:6px;padding:2px 6px;border-radius:5px;${win?'background:var(--grad);color:#06121a;font-weight:700':'color:var(--mut)'}"><span>${TEAMS[en].flag} ${TEAMS[en].es}${m.pen&&win?' (p)':''}</span><span>${gf}</span></div>`;};
+    return `<div style="background:rgba(24,27,33,.6);border:1px solid var(--line);border-radius:8px;padding:3px;margin:4px 0;font-size:10.5px;min-width:148px">${row(m.a)}${row(m.b)}</div>`;}).join('');
+    cols+=`<div style="display:flex;flex-direction:column;justify-content:space-around"><div style="font-size:11px;color:var(--teal);font-weight:700;text-align:center;margin-bottom:4px">${names[r]||''}</div>${cells}</div>`;}
+  cols+=`<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:120px"><div style="font-size:11px;color:var(--amber);font-weight:700;margin-bottom:6px">🏆 Campeón</div><div style="font-size:38px">${TEAMS[SAMPLE.champ].flag}</div><div style="font-weight:800;text-align:center">${TEAMS[SAMPLE.champ].es}</div></div>`;
+  host.innerHTML=`<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px">${cols}</div>`;}
+function newBracket(){SAMPLE=simTournament(true);renderBracket();}
+function renderAllViz(){renderTreemap();renderWorldMap();renderTeamRadar();}
+
+/* ---- camino al título por equipo ---- */
+function showPath(en){if(!TSIM)return;const n=TSIM.n,t=TEAMS[en];
+  const rows=[['Avanza de grupo',TSIM.adv[en]/n],['Llega a Octavos',TSIM.r16[en]/n],['Llega a Cuartos',TSIM.qf[en]/n],['Llega a Semis',TSIM.sf[en]/n],['Llega a la Final',TSIM.fin[en]/n],['🏆 Campeón',TSIM.champ[en]/n]];
+  openModal(`<div class="pmodal"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:40px">${t.flag}</div><div><div style="font-size:20px;font-weight:800">${t.es}</div><div style="color:var(--mut);font-size:12.5px">Camino al título · ${n.toLocaleString('es')} simulaciones</div></div></div>
+    <div style="margin-top:14px">${rows.map(r=>`<div style="margin:9px 0"><div style="display:flex;justify-content:space-between;font-size:12.5px"><span>${r[0]}</span><b style="color:var(--teal)">${(r[1]*100).toFixed(1)}%</b></div><div class="rbar"><i style="width:${Math.max(1,r[1]*100)}%"></i></div></div>`).join('')}</div>
+    <div style="margin-top:12px;text-align:right"><button class="btn ghost sm" onclick="goTeam('${en}');closeModal()">Ver ficha</button> <button class="btn ghost sm" onclick="closeModal()">Cerrar</button></div></div>`);}
+
+/* ---- escenarios: forzar resultado ---- */
+function forceRes(key,ga,gb){LIVE[key]={ga,gb};saveLive();openMatch(key);renderMatches();reGroup();renderDash();}
+
+/* ---- partido en detalle: distribución de marcadores ---- */
+function scorelineStats(la,lb){const pa=pmf(la,8),pb=pmf(lb,8);const grid=[];let over=0,btts=0;
+  for(let i=0;i<pa.length;i++)for(let j=0;j<pb.length;j++){const pr=pa[i]*pb[j];grid.push({i,j,pr});if(i+j>=3)over+=pr;if(i>0&&j>0)btts+=pr;}
+  grid.sort((x,y)=>y.pr-x.pr);return{top:grid.slice(0,6),over,btts};}
+
 /* ===== INIT ===== */
 renderDash();renderMatches();renderGroups();renderTeamGrid('');syncF();runSim();renderPredModel();renderRefs();renderHistorias();
+ENS.slice().sort((a,b)=>TEAMS[a].es.localeCompare(TEAMS[b].es)).forEach(en=>{const o=document.createElement('option');o.value=en;o.textContent=TEAMS[en].flag+' '+TEAMS[en].es;$('#vizRadarSel').appendChild(o);});
+$('#vizRadarSel').value='Spain';$('#vizRadarSel').addEventListener('change',renderTeamRadar);
+$('#newBracket').addEventListener('click',newBracket);
+renderTeamRadar();renderBracket();renderTreemap();renderWorldMap();
 setTimeout(()=>{runGroupSim(2000);renderGroups();},60);
 </script>
 </body>
