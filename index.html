@@ -430,6 +430,18 @@
   <!-- EN VIVO · DATOS -->
   <section class="panel" id="envivo">
     <div class="secthead"><div><h2>📝 En vivo · alimenta el modelo</h2><p>Carga lo que va pasando en el Mundial —resultados, goles, posesión, remates y lesiones— y la predicción se adapta al rendimiento real (no solo al marcador). Todo se guarda en tu navegador.</p></div></div>
+    <div class="card" style="margin-bottom:14px;border-color:rgba(0,229,238,.35)">
+      <h3 style="font-size:15px;margin-bottom:4px">🔄 Actualización automática por API</h3>
+      <p style="font-size:12px;color:var(--mut2);margin-bottom:10px">Pega tu clave, pulsa actualizar y la app trae <b>resultados y lesiones reales</b> del Mundial — el modelo se re-adapta solo. La clave se guarda únicamente en tu navegador.</p>
+      <div class="controls" style="margin-bottom:8px">
+        <select id="apiProv" style="min-width:200px"><option value="apifootball">API-Football (recomendado · con clave)</option><option value="sportsdb">TheSportsDB (gratis · sin clave)</option></select>
+        <input type="text" id="apiKey" placeholder="🔑 Pega aquí tu API key…" style="flex:1;min-width:220px">
+        <button class="btn" id="apiGo">🔄 Actualizar todo ahora</button>
+        <label class="switch"><input type="checkbox" id="apiAuto"><span class="track"></span> ⏱️ Auto cada 2 min</label>
+      </div>
+      <div id="apiStatus" class="simnote"></div>
+      <div style="font-size:11px;color:var(--mut2);margin-top:7px">💡 Clave gratis en <b>dashboard.api-football.com</b> (100 peticiones/día). API-Football permite llamadas directas desde el navegador; con TheSportsDB no necesitas clave pero su cobertura puede tardar.</div>
+    </div>
     <div class="two">
       <div class="card"><h3 style="font-size:15px;margin-bottom:8px">✍️ Cargar / editar un partido</h3>
         <p style="font-size:12px;color:var(--mut2);margin-bottom:8px">Elige el partido y abre el formulario: marcador, estado, goleadores, posesión, remates y nota.</p>
@@ -1038,11 +1050,18 @@ function assignRef(i){const sel=$('#refAssignSel');if(!sel)return;MATCHREF[sel.v
 function unassignRef(key,i){delete MATCHREF[key];saveRef();openRef(i);renderMatches();}
 
 /* CONECTOR DE DATOS EN VIVO */
-const NAMEIDX={};ENS.forEach(e=>{NAMEIDX[TEAMS[e].es.toLowerCase()]=e;NAMEIDX[e.toLowerCase()]=e;});
-const ALIAS={'turquia':'Turkey','turquía':'Turkey','korea republic':'South Korea','eeuu':'USA','united states':'USA','republica checa':'Czech Republic','república checa':'Czech Republic','czechia':'Czech Republic','cote divoire':'Ivory Coast','holanda':'Netherlands','sudafrica':'South Africa','rd congo':'DR Congo','bosnia':'Bosnia-Herzegovina'};
-function resolveTeam(s){if(!s)return null;const x=s.trim().toLowerCase();if(NAMEIDX[x])return NAMEIDX[x];if(ALIAS[x])return ALIAS[x];
-  for(const e of ENS){if(TEAMS[e].es.toLowerCase()===x||e.toLowerCase()===x)return e;}
-  for(const e of ENS){if(x.includes(TEAMS[e].es.toLowerCase())||x.includes(e.toLowerCase()))return e;}return null;}
+const NAMEIDX={};
+function normName(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[&./'’-]+/g,' ').replace(/\s+/g,' ').trim();}
+ENS.forEach(e=>{NAMEIDX[normName(TEAMS[e].es)]=e;NAMEIDX[normName(e)]=e;});
+const ALIAS={'turquia':'Turkey','turkiye':'Turkey','korea republic':'South Korea','eeuu':'USA','united states':'USA','usa':'USA','republica checa':'Czech Republic','czechia':'Czech Republic','cote d ivoire':'Ivory Coast','cote divoire':'Ivory Coast','holanda':'Netherlands','sudafrica':'South Africa','rd congo':'DR Congo','congo dr':'DR Congo','dr congo':'DR Congo','bosnia':'Bosnia-Herzegovina','bosnia herzegovina':'Bosnia-Herzegovina','ir iran':'Iran','cape verde islands':'Cape Verde','korea del sur':'South Korea'};
+function resolveTeam(s){if(!s)return null;const x=normName(s);if(NAMEIDX[x])return NAMEIDX[x];if(ALIAS[x])return ALIAS[x];
+  for(const k in ALIAS){if(x.includes(k))return ALIAS[k];}
+  for(const e of ENS){const a=normName(TEAMS[e].es),b=normName(e);if(x.includes(a)||a.includes(x)||x.includes(b)||b.includes(x))return e;}return null;}
+function findPlayerIdx(en,name){const n=normName(name);if(!n||!TEAMS[en])return -1;const ps=TEAMS[en].players;
+  let i=ps.findIndex(p=>normName(p.name)===n);if(i>=0)return i;
+  i=ps.findIndex(p=>{const pn=normName(p.name);return pn.includes(n)||n.includes(pn);});if(i>=0)return i;
+  const last=n.split(' ').pop();if(last&&last.length>3){i=ps.findIndex(p=>normName(p.name).split(' ').pop()===last);if(i>=0)return i;}
+  return -1;}
 function findMatch(a,b){return MATCHES.find(m=>(m.a===a&&m.b===b)||(m.a===b&&m.b===a));}
 function applyTextResults(text){let ok=0,fail=0;String(text||'').split('\n').forEach(line=>{line=line.trim();if(!line)return;
   const m=line.match(/^(.+?)\s+(\d+)\s*[-:a]\s*(\d+)\s+(.+)$/i);if(!m){fail++;return;}
@@ -1385,6 +1404,55 @@ function renderTeamPool(){const tp=$('#teamPool');if(!tp)return;
     `<span class="tpchip" draggable="true" ondragstart="teamDragStart(event,'${en}')" onclick="poolClick('${en}')">${TEAMS[en].flag} ${TEAMS[en].es}</span>`).join('');}
 function poolClick(en){POOLSIDE=POOLSIDE==='A'?'B':'A';$(POOLSIDE==='A'?'#simA':'#simB').value=en;syncF();runSim();}
 
+/* ===== API EN VIVO (clave del usuario) ===== */
+const APICFGKEY='wc2026_apicfg_v1';
+let APICFG={provider:'apifootball',key:'',auto:false,last:null},APITIMER=null;
+try{APICFG=Object.assign(APICFG,JSON.parse(localStorage.getItem(APICFGKEY)||'{}'));}catch(e){}
+function saveApi(){try{localStorage.setItem(APICFGKEY,JSON.stringify(APICFG));}catch(e){}}
+function applyFixture(homeName,awayName,gh,gaw,statusShort){
+  const ta=resolveTeam(homeName),tb=resolveTeam(awayName);if(!ta||!tb)return 0;
+  const mt=findMatch(ta,tb);if(!mt)return 0;
+  if(gh==null||gaw==null)return 0;
+  let ga=+gh,gb=+gaw;if(mt.a!==ta){const z=ga;ga=gb;gb=z;}
+  LIVE[mt.key]={ga,gb};
+  const meta=getMeta(mt.key);
+  meta.status=(statusShort==='FT'||statusShort==='AET'||statusShort==='PEN'||statusShort==='final')?'final':(statusShort==='NS'||statusShort===''?meta.status:'live');
+  return 1;}
+async function apiUpdateAll(){
+  const st=$('#apiStatus');const say=h=>{if(st)st.innerHTML=h;};
+  let ok=0,injN=0;
+  say('<span class="spinner"></span> Consultando la API…');
+  try{
+    if(APICFG.provider==='apifootball'){
+      if(!APICFG.key){say('⚠️ Pega primero tu API key de API-Football.');return;}
+      const r=await fetch('https://v3.football.api-sports.io/fixtures?league=1&season=2026',{headers:{'x-apisports-key':APICFG.key}});
+      const d=await r.json();
+      if(d.errors&&Object.keys(d.errors).length)throw new Error(typeof d.errors==='object'?JSON.stringify(d.errors):d.errors);
+      (d.response||[]).forEach(fx=>{ok+=applyFixture(fx.teams&&fx.teams.home&&fx.teams.home.name,fx.teams&&fx.teams.away&&fx.teams.away.name,fx.goals&&fx.goals.home,fx.goals&&fx.goals.away,fx.fixture&&fx.fixture.status&&fx.fixture.status.short);});
+      try{
+        const ri=await fetch('https://v3.football.api-sports.io/injuries?league=1&season=2026',{headers:{'x-apisports-key':APICFG.key}});
+        const di=await ri.json();
+        (di.response||[]).forEach(it=>{const en=resolveTeam(it.team&&it.team.name);if(!en)return;
+          const idx=findPlayerIdx(en,it.player&&it.player.name);
+          if(idx>=0&&!LIVEINJ[injKey(en,idx)]){LIVEINJ[injKey(en,idx)]=1;injN++;}});
+        if(injN)saveInj();
+      }catch(e){}
+    }else{
+      const k=(APICFG.key||'3');const url='https://www.thesportsdb.com/api/v1/json/'+k+'/eventsseason.php?id=4429&s=2026';
+      let evs=null;
+      try{const r=await fetch(url);const d=await r.json();evs=(d&&d.events)||[];}catch(e){
+        const r=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url));const d=await r.json();evs=(d&&d.events)||[];}
+      evs.forEach(ev=>{ok+=applyFixture(ev.strHomeTeam,ev.strAwayTeam,ev.intHomeScore,ev.intAwayScore,ev.strStatus==='Match Finished'?'FT':(ev.strStatus||''));});
+    }
+    saveLive();saveMeta();APICFG.last=Date.now();saveApi();
+    renderMatches();renderDash();renderLiveHub();clearTimeout(_reGroupTimer);_reGroupTimer=setTimeout(reGroup,300);
+    say(ok?('✅ <b>'+ok+'</b> partido(s) actualizados'+(injN?' · <b>'+injN+'</b> lesión(es) detectadas':'')+' · '+new Date().toLocaleTimeString()+'. El modelo ya se re-adaptó.'):'Conectó bien, pero la API aún no publica resultados de partidos jugados. Reintenta más tarde o usa la carga manual.');
+  }catch(e){
+    say('⚠️ No se pudo: '+(e&&e.message?String(e.message).slice(0,120):'error de red')+'. Revisa la clave (o el límite diario). Si el navegador bloquea la llamada (CORS), prueba el otro proveedor o la carga manual.');
+  }}
+function setAutoApi(on){APICFG.auto=!!on;saveApi();clearInterval(APITIMER);APITIMER=null;
+  if(on){APITIMER=setInterval(apiUpdateAll,120000);apiUpdateAll();}}
+
 /* ===== HUB EN VIVO ===== */
 function hubRefresh(){const p=document.getElementById('envivo');if(p&&p.classList.contains('active'))renderLiveHub();}
 function hasData(m){const lv=LIVE[m.key],mt=LIVEMETA[m.key];return !!(lv||(mt&&(mt.status||mt.poss!=null||mt.shA!=null||(mt.sa&&mt.sa.length)||(mt.sb&&mt.sb.length)||mt.note)));}
@@ -1419,6 +1487,14 @@ MATCHES.forEach(m=>{const o=document.createElement('option');o.value=m.key;o.tex
 $('#liveOpenBtn').addEventListener('click',()=>openMatch($('#liveMatchSel').value));
 $('#liveInjSearch').addEventListener('input',e=>renderLiveInjuries(e.target.value));
 $('#liveReset').addEventListener('click',()=>{if(confirm('¿Borrar TODOS los datos en vivo (resultados, posesión, remates, goleadores y lesiones)?')){LIVE={};LIVEMETA={};LIVEINJ={};saveLive();saveMeta();saveInj();renderMatches();reGroup();renderDash();renderLiveHub();}});
+$('#apiProv').value=APICFG.provider;$('#apiKey').value=APICFG.key||'';
+$('#apiProv').addEventListener('change',e=>{APICFG.provider=e.target.value;saveApi();});
+$('#apiKey').addEventListener('input',e=>{APICFG.key=e.target.value.trim();saveApi();});
+$('#apiGo').addEventListener('click',apiUpdateAll);
+$('#apiAuto').checked=!!APICFG.auto;
+$('#apiAuto').addEventListener('change',e=>setAutoApi(e.target.checked));
+if(APICFG.auto){APITIMER=setInterval(apiUpdateAll,120000);}
+if(APICFG.last&&$('#apiStatus'))$('#apiStatus').textContent='Última actualización: '+new Date(APICFG.last).toLocaleString();
 renderLiveHub();
 renderTeamRadar();renderBracket();renderTreemap();renderWorldMap();
 setTimeout(()=>{runGroupSim(2000);renderGroups();},60);
