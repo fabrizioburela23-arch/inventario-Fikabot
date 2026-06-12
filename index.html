@@ -246,6 +246,26 @@
   @keyframes glowpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,229,238,.0)}50%{box-shadow:0 0 14px 1px rgba(0,229,238,.6)}}
   .realbadge{animation:glowpulse 2s infinite}
   .death.hi{box-shadow:0 0 12px rgba(255,90,90,.25)}
+
+  /* ===== v8 · dinámica, drag&drop, MC masivo ===== */
+  .rbar i,.bar span,.advbar i,.dim .db i,.posbar i,.ib i{transition:width .7s cubic-bezier(.22,1,.36,1)}
+  .grid .match{animation:fade .35s ease both}
+  .dropzone{border:2px dashed rgba(140,150,170,.28);border-radius:18px;padding:12px;transition:.2s}
+  .dropzone.over{border-color:var(--teal);background:rgba(0,229,238,.09);transform:scale(1.04);box-shadow:0 0 20px rgba(0,229,238,.28)}
+  .dropzone .drophint{font-size:10.5px;color:var(--mut2);margin-top:7px}
+  .teampool{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px;max-height:148px;overflow-y:auto;padding:10px;background:rgba(24,27,33,.45);border:1px solid var(--line);border-radius:14px}
+  .tpchip{font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(40,43,50,.6);border:1px solid var(--line);cursor:grab;user-select:none;transition:.15s;white-space:nowrap}
+  .tpchip:hover{border-color:var(--teal);transform:translateY(-1px)}
+  .tpchip:active{cursor:grabbing}
+  .plchip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(40,43,50,.6);border:1px solid var(--line);cursor:grab;user-select:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .plchip:hover{border-color:var(--teal)}
+  .h2h{display:grid;grid-template-columns:1fr 44px 1fr;gap:8px;align-items:start;margin:8px 0}
+  .h2h .ib{height:6px;border-radius:4px;background:#1d2129;overflow:hidden;margin-top:4px}
+  .h2h .ib i{display:block;height:100%}
+  .posrow{display:grid;grid-template-columns:34px 1fr 52px 1fr 34px;gap:8px;align-items:center;font-size:11.5px;margin:7px 0}
+  .posbar{height:9px;border-radius:5px;background:#1d2129;overflow:hidden}
+  .posbar i{display:block;height:100%}
+  tr[draggable=true]{cursor:grab}
 </style>
 </head>
 <body>
@@ -321,18 +341,28 @@
 
   <!-- SIMULADOR -->
   <section class="panel" id="simulador">
-    <div class="secthead"><div><h2>Simulador cara a cara</h2><p>Enfrenta cualquier par de selecciones al instante.</p></div></div>
+    <div class="secthead"><div><h2>Simulador cara a cara</h2><p>Arrastra una selección a cada lado (o usa los menús), predice, simula el partido hasta 1.000.000 de veces y compara a todos los jugadores con gráficas superpuestas.</p></div></div>
     <div class="card">
       <div class="simgrid">
-        <div class="simteam"><div class="bigflag" id="simFlagA">🇦🇷</div><select id="simA" style="width:100%;margin-top:8px"></select></div>
+        <div class="simteam dropzone" id="dropA" ondragover="slotDragOver(event)" ondragleave="slotDragLeave(event)" ondrop="slotDrop(event,'A')">
+          <div class="bigflag" id="simFlagA">🇦🇷</div><select id="simA" style="width:100%;margin-top:8px"></select>
+          <div class="drophint">⬇️ suelta aquí una selección</div></div>
         <div class="simvs">VS</div>
-        <div class="simteam"><div class="bigflag" id="simFlagB">🇫🇷</div><select id="simB" style="width:100%;margin-top:8px"></select></div>
+        <div class="simteam dropzone" id="dropB" ondragover="slotDragOver(event)" ondragleave="slotDragLeave(event)" ondrop="slotDrop(event,'B')">
+          <div class="bigflag" id="simFlagB">🇫🇷</div><select id="simB" style="width:100%;margin-top:8px"></select>
+          <div class="drophint">⬇️ suelta aquí una selección</div></div>
       </div>
+      <div class="teampool" id="teamPool"></div>
       <div class="controls" style="justify-content:center;margin:16px 0 0">
         <label class="switch"><input type="checkbox" id="simHost"><span class="track"></span> Ventaja de local</label>
         <button class="btn" id="simBtn">🎯 Predecir</button>
+        <select id="mcN"><option value="1000">1.000</option><option value="10000">10.000</option><option value="100000" selected>100.000</option><option value="500000">500.000</option><option value="1000000">1.000.000</option></select>
+        <button class="btn ghost" id="mcBtn">🎲 Simular partido N veces</button>
       </div>
+      <div class="simnote" id="mcNote" style="text-align:center;margin-top:8px"></div>
       <div id="simOut" style="margin-top:18px"></div>
+      <div id="mcOut" style="margin-top:14px"></div>
+      <div id="cmpOut" style="margin-top:14px"></div>
     </div>
   </section>
 
@@ -344,7 +374,7 @@
       <div class="card">
         <h3 style="font-size:15px;margin-bottom:6px">🎲 Simulación Montecarlo del torneo</h3>
         <div class="toolbar"><button class="btn sm" id="runTour">Simular torneo</button>
-          <select id="nSims"><option value="2000">2.000</option><option value="5000" selected>5.000</option><option value="10000">10.000</option><option value="25000">25.000</option><option value="50000">50.000 (preciso)</option></select>
+          <select id="nSims"><option value="2000">2.000</option><option value="5000" selected>5.000</option><option value="10000">10.000</option><option value="25000">25.000</option><option value="50000">50.000</option><option value="100000">100.000</option><option value="500000">500.000</option><option value="1000000">1.000.000 (máximo)</option></select>
           <span class="simnote" id="tourNote">Pulsa para calcular.</span></div>
         <div class="rank" id="tourOut" style="margin-top:8px"></div>
       </div>
@@ -575,8 +605,11 @@ function pmf(l,k=9){const o=[];let p=Math.exp(-l);for(let i=0;i<=k;i++){o.push(p
 function predict(cA,cB,hA,hB){const[la,lb]=lambdas(cA,cB,hA,hB);const pa=pmf(la),pb=pmf(lb);
   let w=0,dr=0,l=0;for(let i=0;i<pa.length;i++)for(let j=0;j<pb.length;j++){const pr=pa[i]*pb[j];if(i>j)w+=pr;else if(i===j)dr+=pr;else l+=pr;}
   const s=w+dr+l;return{w:w/s,dr:dr/s,l:l/s,la,lb,scA:Math.round(la),scB:Math.round(lb)};}
-function rpois(l){const L=Math.exp(-l);let k=0,p=1;do{k++;p*=Math.random();}while(p>L);return k-1;}
-function simGoals(cA,cB,hA,hB){const[la,lb]=lambdas(cA,cB,hA,hB);return[rpois(la),rpois(lb)];}
+/* muestreo rápido de goles: CDF de Poisson cacheada (≈10x más veloz que Knuth) */
+const CDFC=new Map();
+function cdfFor(la){const k=Math.round(la*2000);let c=CDFC.get(k);if(!c){c=[];let p=Math.exp(-la),cum=0;for(let i=0;i<=10;i++){cum+=p;c.push(cum);p*=la/(i+1);}c[c.length-1]=1.01;CDFC.set(k,c);}return c;}
+function sampleCdf(c){const r=Math.random();let k=0;while(r>c[k])k++;return k;}
+function simGoals(cA,cB,hA,hB){const[la,lb]=lambdas(cA,cB,hA,hB);return[sampleCdf(cdfFor(la)),sampleCdf(cdfFor(lb))];}
 
 /* ===== LIVE results (localStorage) ===== */
 const LKEY='wc2026_live_v1';
@@ -614,10 +647,68 @@ function runGroupSim(n){const gpos={},adv={},gw={};ENS.forEach(e=>{gpos[e]={1:0,
 function runTourSim(n){const champ={},fin={},sf={},qf={},r16={},adv={};ENS.forEach(e=>{champ[e]=0;fin[e]=0;sf[e]=0;qf[e]=0;r16[e]=0;adv[e]=0;});
   for(let s=0;s<n;s++){const r=simTournament();r.q.forEach(e=>adv[e]++);r.r16.forEach(e=>r16[e]++);r.qf.forEach(e=>qf[e]++);r.sf.forEach(e=>sf[e]++);r.fn.forEach(e=>fin[e]++);champ[r.champ]++;}
   TSIM={n,champ,fin,sf,qf,r16,adv};return TSIM;}
-function runTourSimAsync(n,onP,onDone){const champ={},fin={},sf={},qf={},r16={},adv={};ENS.forEach(e=>{champ[e]=0;fin[e]=0;sf[e]=0;qf[e]=0;r16[e]=0;adv[e]=0;});
-  let done=0;const batch=Math.max(400,Math.floor(n/50));
+function runTourSimAsyncJS(n,onP,onDone){const champ={},fin={},sf={},qf={},r16={},adv={};ENS.forEach(e=>{champ[e]=0;fin[e]=0;sf[e]=0;qf[e]=0;r16[e]=0;adv[e]=0;});
+  let done=0;const batch=Math.max(400,Math.floor(n/100));
   (function step(){const end=Math.min(n,done+batch);for(;done<end;done++){const r=simTournament();r.q.forEach(e=>adv[e]++);r.r16.forEach(e=>r16[e]++);r.qf.forEach(e=>qf[e]++);r.sf.forEach(e=>sf[e]++);r.fn.forEach(e=>fin[e]++);champ[r.champ]++;}
     onP&&onP(done/n);if(done<n)setTimeout(step,0);else{TSIM={n,champ,fin,sf,qf,r16,adv};onDone&&onDone();}})();}
+
+/* ---- Web Worker: torneo masivo (hasta 1.000.000) sin congelar la página ---- */
+const TOURW_SRC=
+'onmessage=function(ev){'+
+'var d=ev.data,comp=d.comp,host=d.host,groups=d.groups,gm=d.gm,seed=d.seed,n=d.n;'+
+'var NT=comp.length,LMAX=4.7,LMIN=0.2,GB=1.32,GKk=0.46,HB=0.35;'+
+'function clamp(x){return Math.min(LMAX,Math.max(LMIN,x));}'+
+'function cdf(la){var out=[],p=Math.exp(-la),c=0,k;for(k=0;k<=10;k++){c+=p;out.push(c);p*=la/(k+1);}out[out.length-1]=1.01;return out;}'+
+'function pair(ci,cj){var di=ci-cj;return [cdf(clamp(GB*Math.exp(di*GKk))),cdf(clamp(GB*Math.exp(-di*GKk)))];}'+
+'var gmT=gm.map(function(m){if(m.live)return null;return pair(comp[m.a]+(host[m.a]?HB:0),comp[m.b]+(host[m.b]?HB:0));});'+
+'var koC={};function koPair(i,j){var k=i*1000+j,v=koC[k];if(!v){v=pair(comp[i],comp[j]);koC[k]=v;}return v;}'+
+'function samp(c){var r=Math.random(),k=0;while(r>c[k])k++;return k;}'+
+'var champ=new Float64Array(NT),fin=new Float64Array(NT),sf=new Float64Array(NT),qf=new Float64Array(NT),r16=new Float64Array(NT),adv=new Float64Array(NT);'+
+'var pts=new Float64Array(NT),gf=new Float64Array(NT),ga=new Float64Array(NT);'+
+'var members=[],g;for(g=0;g<12;g++)members.push([]);'+
+'for(var i0=0;i0<NT;i0++)members[groups[i0]].push(i0);'+
+'function rankCmp(x,y){if(pts[y]!==pts[x])return pts[y]-pts[x];var dx=gf[x]-ga[x],dy=gf[y]-ga[y];if(dy!==dx)return dy-dx;if(gf[y]!==gf[x])return gf[y]-gf[x];return Math.random()-0.5;}'+
+'function byComp(a,b){return comp[b]-comp[a];}'+
+'function round(arr,tally){var nx=[],ii;for(ii=0;ii<arr.length;ii+=2){var A=arr[ii],B=arr[ii+1],t2=koPair(A,B),ka=samp(t2[0]),kb=samp(t2[1]),w;'+
+'if(ka>kb)w=A;else if(kb>ka)w=B;else{var e=1/(1+Math.pow(10,(comp[B]-comp[A])*0.55));w=Math.random()<e?A:B;}'+
+'nx.push(w);if(tally)tally[w]++;}return nx;}'+
+'var rep=Math.max(1,Math.floor(n/100));'+
+'for(var s=0;s<n;s++){'+
+'pts.fill(0);gf.fill(0);ga.fill(0);'+
+'for(var mi=0;mi<gm.length;mi++){var m=gm[mi],x,y2;'+
+'if(m.live){x=m.ga;y2=m.gb;}else{var t=gmT[mi];x=samp(t[0]);y2=samp(t[1]);}'+
+'gf[m.a]+=x;ga[m.a]+=y2;gf[m.b]+=y2;ga[m.b]+=x;'+
+'if(x>y2)pts[m.a]+=3;else if(y2>x)pts[m.b]+=3;else{pts[m.a]++;pts[m.b]++;}}'+
+'var win=[],run=[],thr=[];'+
+'for(var g2=0;g2<12;g2++){var ts=members[g2].slice().sort(rankCmp);win.push(ts[0]);run.push(ts[1]);thr.push(ts[2]);}'+
+'thr.sort(rankCmp);'+
+'var q=win.concat(run,thr.slice(0,8));q.sort(byComp);'+
+'var br=[],si;for(si=0;si<32;si++){br.push(q[seed[si]-1]);adv[q[seed[si]-1]]++;}'+
+'var r=round(br,r16);r=round(r,qf);r=round(r,sf);r=round(r,fin);'+
+'champ[round(r,null)[0]]++;'+
+'if(s%rep===0)postMessage({t:"p",d:s});'+
+'}'+
+'postMessage({t:"d",champ:champ,fin:fin,sf:sf,qf:qf,r16:r16,adv:adv});'+
+'};';
+function runTourWorker(n,onP,onDone){
+  try{
+    if(typeof Worker==='undefined'||typeof Blob==='undefined'||typeof URL==='undefined')return false;
+    const idx={};ENS.forEach((e,i)=>idx[e]=i);
+    const comp=ENS.map(e=>C(e)),host=ENS.map(e=>TEAMS[e].host?1:0),groups=ENS.map(e=>GROUPS.indexOf(TEAMS[e].group));
+    const gm=MATCHES.map(m=>{const lv=LIVE[m.key];return lv?{a:idx[m.a],b:idx[m.b],live:1,ga:lv.ga,gb:lv.gb}:{a:idx[m.a],b:idx[m.b]};});
+    const w=new Worker(URL.createObjectURL(new Blob([TOURW_SRC],{type:'application/javascript'})));
+    let settled=false;
+    w.onmessage=ev=>{const d=ev.data;
+      if(d.t==='p'){onP&&onP(d.d/n);return;}
+      settled=true;const o={n,champ:{},fin:{},sf:{},qf:{},r16:{},adv:{}};
+      ENS.forEach((e,i)=>{o.champ[e]=d.champ[i];o.fin[e]=d.fin[i];o.sf[e]=d.sf[i];o.qf[e]=d.qf[i];o.r16[e]=d.r16[i];o.adv[e]=d.adv[i];});
+      TSIM=o;w.terminate();onDone&&onDone();};
+    w.onerror=()=>{w.terminate();if(!settled){settled=true;runTourSimAsyncJS(n,onP,onDone);}};
+    w.postMessage({comp,host,groups,gm,seed:SEED32,n});
+    return true;
+  }catch(e){return false;}
+}
+function runTourSimAsync(n,onP,onDone){if(!runTourWorker(n,onP,onDone))runTourSimAsyncJS(n,onP,onDone);}
 
 /* ===== helpers ===== */
 const $=s=>document.querySelector(s);
@@ -733,7 +824,7 @@ function showTeam(en){const t=TEAMS[en];const d=t.pred.dimension_scores;
   const dims=Object.keys(DIMLABEL).map(k=>{const v=d[k]||0;return `<div class="dim"><div class="dl">${DIMLABEL[k][0]} <small>(${DIMLABEL[k][1]}%)</small></div><div class="db"><i style="width:${v*10}%"></i></div><div class="dv">${v.toFixed(1)}</div></div>`;}).join('');
   const order={GK:0,DF:1,MF:2,FW:3};const posName={GK:'Porteros',DF:'Defensas',MF:'Mediocampistas',FW:'Delanteros'};
   let squad='';['GK','DF','MF','FW'].forEach(pos=>{const pl=t.players.map((p,i)=>({p,i})).filter(o=>posGroup(o.p.position)===pos);if(!pl.length)return;
-    squad+=`<div class="poshead">${posName[pos]} (${pl.length})</div><table class="sq">`+pl.map(({p,i})=>{const inj=isInj(en,i,p);return `<tr class="${inj?'inj':''}" style="cursor:pointer" onclick="openPlayer('${en}',${i})">
+    squad+=`<div class="poshead">${posName[pos]} (${pl.length})</div><table class="sq">`+pl.map(({p,i})=>{const inj=isInj(en,i,p);return `<tr class="${inj?'inj':''}" style="cursor:pointer" draggable="true" ondragstart="plDragStart(event,'${en}',${i})" ondragover="event.preventDefault()" ondrop="plDrop(event,'${en}',${i})" onclick="openPlayer('${en}',${i})">
       <td class="pnum">${p.number||''}</td><td><b>${p.name}</b>${inj?'<span class="injtag">LESIÓN</span>':''}${p.rating_2526?` <span style="color:var(--teal);font-size:11px">★${p.rating_2526}</span>`:''}<div style="font-size:11px;color:var(--mut2)">${p.club||''} · ${p.age||'?'} años</div>${inj&&p.injury_notes?`<div style="font-size:10.5px;color:#fda4af">${p.injury_notes}</div>`:''}</td>
       <td class="pstat">${p.intl_caps||0} pj · ${p.intl_goals||0} g<br><span style="color:var(--teal)">▸ análisis</span></td></tr>`;}).join('')+`</table>`;});
   const c=t.coach||{};
@@ -777,7 +868,9 @@ function runSim(){const a=$('#simA').value,b=$('#simB').value;if(a===b){$('#simO
       <div class="kv"><div class="k">IPP</div><div class="v">${A.ipp} vs ${B.ipp}</div></div></div>
     <h3 style="font-size:13px;margin:16px 0 6px">🎯 Marcadores más probables</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${ss.top.map(s=>`<div style="background:rgba(24,27,33,.6);border:1px solid var(--line);border-radius:10px;padding:7px 11px;text-align:center;min-width:54px"><div style="font-weight:800;font-size:15px">${s.i}-${s.j}</div><div style="font-size:11px;color:var(--mut)">${(s.pr*100).toFixed(1)}%</div></div>`).join('')}</div>
-    <div class="kvs" style="margin-top:10px"><div class="kv"><div class="k">Más de 2.5 goles</div><div class="v">${pct(ss.over)}%</div></div><div class="kv"><div class="k">Menos de 2.5</div><div class="v">${pct(1-ss.over)}%</div></div><div class="kv"><div class="k">Ambos marcan</div><div class="v">${pct(ss.btts)}%</div></div><div class="kv"><div class="k">Si fuese eliminatoria · pasa ${A.es}</div><div class="v">${pct(pr.w+pr.dr*(1/(1+Math.pow(10,(C(b)-C(a))*0.55))))}%</div></div></div>`;}
+    <div class="kvs" style="margin-top:10px"><div class="kv"><div class="k">Más de 2.5 goles</div><div class="v">${pct(ss.over)}%</div></div><div class="kv"><div class="k">Menos de 2.5</div><div class="v">${pct(1-ss.over)}%</div></div><div class="kv"><div class="k">Ambos marcan</div><div class="v">${pct(ss.btts)}%</div></div><div class="kv"><div class="k">Si fuese eliminatoria · pasa ${A.es}</div><div class="v">${pct(pr.w+pr.dr*(1/(1+Math.pow(10,(C(b)-C(a))*0.55))))}%</div></div></div>`;
+  if(typeof renderMatchComparison==='function')renderMatchComparison(a,b);
+  const mo=$('#mcOut');if(mo)mo.innerHTML='';const mn=$('#mcNote');if(mn)mn.textContent='';}
 $('#simBtn').addEventListener('click',runSim);$('#simHost').addEventListener('change',runSim);
 
 /* ===== PREDICTION ===== */
@@ -1140,11 +1233,128 @@ function scorelineStats(la,lb){const pa=pmf(la,8),pb=pmf(lb,8);const grid=[];let
   for(let i=0;i<pa.length;i++)for(let j=0;j<pb.length;j++){const pr=pa[i]*pb[j];grid.push({i,j,pr});if(i+j>=3)over+=pr;if(i>0&&j>0)btts+=pr;}
   grid.sort((x,y)=>y.pr-x.pr);return{top:grid.slice(0,6),over,btts};}
 
+/* ===== v8 · MC DE PARTIDO (1.000 → 1.000.000) · COMPARACIÓN TOTAL · DRAG & DROP ===== */
+function countUp(id,val,dec,suf){const el=document.getElementById(id);if(!el)return;
+  if(typeof requestAnimationFrame!=='function'){el.textContent=val.toFixed(dec)+(suf||'');return;}
+  const t0=performance.now(),dur=850;(function f(t){const k=Math.min(1,(t-t0)/dur);const e=1-Math.pow(1-k,3);
+    el.textContent=(val*e).toFixed(dec)+(suf||'');if(k<1)requestAnimationFrame(f);})(t0);}
+
+function histSVG(hA,hB){const K=7,a=[],b=[];
+  for(let k=0;k<K;k++){a.push(k<6?hA[k]:hA[6]+hA[7]+hA[8]+hA[9]+hA[10]);b.push(k<6?hB[k]:hB[6]+hB[7]+hB[8]+hB[9]+hB[10]);}
+  const mx=Math.max(...a,...b)||1,W=340,H=130,bw=W/K;
+  let s=`<svg viewBox="0 0 ${W} ${H+22}" width="100%" style="max-width:400px;display:block;margin:0 auto">`;
+  for(let k=0;k<K;k++){const ha=a[k]/mx*H,hb=b[k]/mx*H,x=k*bw;
+    s+=`<rect x="${x+5}" y="${(H-ha).toFixed(1)}" width="${bw-10}" height="${ha.toFixed(1)}" rx="3" fill="#00b9ee" fill-opacity="0.62"/>`;
+    s+=`<rect x="${x+5}" y="${(H-hb).toFixed(1)}" width="${bw-10}" height="${hb.toFixed(1)}" rx="3" fill="#ff6a5a" fill-opacity="0.55"/>`;
+    s+=`<text x="${x+bw/2}" y="${H+15}" font-size="10" fill="#b9bed0" text-anchor="middle">${k<6?k:'6+'}</text>`;}
+  return s+'</svg>';}
+
+let MCBUSY=false;
+function runMatchMC(){
+  if(MCBUSY)return;const a=$('#simA').value,b=$('#simB').value;
+  if(a===b){$('#mcNote').textContent='Elige dos selecciones distintas.';return;}
+  const n=parseInt($('#mcN').value,10)||10000;const host=$('#simHost').checked;
+  const A=TEAMS[a],B=TEAMS[b];
+  const[la,lb]=lambdas(C(a),C(b),host&&A.host,host&&B.host);
+  const ca=cdfFor(la),cb=cdfFor(lb);
+  let w=0,dr=0,l=0,sgA=0,sgB=0,over=0,btts=0,done=0;
+  const hA=new Float64Array(11),hB=new Float64Array(11),grid=new Float64Array(121);
+  MCBUSY=true;const btn=$('#mcBtn');if(btn)btn.disabled=true;
+  const t0=(typeof performance!=='undefined'?performance.now():Date.now());
+  (function step(){
+    const end=Math.min(n,done+60000);
+    for(;done<end;done++){const x=sampleCdf(ca),y=sampleCdf(cb);
+      hA[x]++;hB[y]++;grid[x*11+y]++;sgA+=x;sgB+=y;
+      if(x>y)w++;else if(x===y)dr++;else l++;
+      if(x+y>=3)over++;if(x>0&&y>0)btts++;}
+    $('#mcNote').innerHTML=`<span class="spinner"></span> ${done.toLocaleString('es')} / ${n.toLocaleString('es')} simulaciones…`;
+    if(done<n){setTimeout(step,0);return;}
+    const ms=Math.round((typeof performance!=='undefined'?performance.now():Date.now())-t0);
+    renderMC({a,b,n,w,dr,l,sgA,sgB,over,btts,hA,hB,grid,ms});
+    $('#mcNote').textContent=`✅ ${n.toLocaleString('es')} simulaciones en ${(ms/1000).toFixed(1)} s`;
+    MCBUSY=false;if(btn)btn.disabled=false;
+  })();}
+function renderMC(r){
+  const A=TEAMS[r.a],B=TEAMS[r.b],n=r.n;
+  const pw=r.w/n,pd=r.dr/n,pl=r.l/n;
+  const tops=[];for(let i=0;i<11;i++)for(let j=0;j<11;j++){const c=r.grid[i*11+j];if(c)tops.push({i,j,c});}
+  tops.sort((x,y)=>y.c-x.c);
+  $('#mcOut').innerHTML=`<div style="border-top:1px dashed var(--line);padding-top:14px">
+    <h3 style="font-size:14px;margin-bottom:8px">🎲 Montecarlo del partido · ${n.toLocaleString('es')} simulaciones</h3>
+    <div class="bar" style="height:16px"><span class="bw" style="width:${pw*100}%"></span><span class="bd" style="width:${pd*100}%"></span><span class="bl" style="width:${pl*100}%"></span></div>
+    <div class="donut">
+      <div class="stat"><div class="big" style="color:var(--teal)" id="mcWn">0%</div><div class="lab">Gana ${A.es} <span style="color:var(--mut2)">±${(ci(pw,n)*100).toFixed(2)}</span></div></div>
+      <div class="stat"><div class="big" style="color:var(--mut)" id="mcDn">0%</div><div class="lab">Empate <span style="color:var(--mut2)">±${(ci(pd,n)*100).toFixed(2)}</span></div></div>
+      <div class="stat"><div class="big" style="color:var(--pink)" id="mcLn">0%</div><div class="lab">Gana ${B.es} <span style="color:var(--mut2)">±${(ci(pl,n)*100).toFixed(2)}</span></div></div>
+    </div>
+    <h3 style="font-size:13px;margin:14px 0 4px">📈 Distribución de goles (superpuesta)</h3>
+    <div style="text-align:center;font-size:11.5px;color:var(--mut);margin-bottom:4px"><span style="color:#00b9ee">●</span> ${A.flag} ${A.es} &nbsp;&nbsp; <span style="color:#ff6a5a">●</span> ${B.flag} ${B.es}</div>
+    ${histSVG(r.hA,r.hB)}
+    <h3 style="font-size:13px;margin:14px 0 6px">🎯 Marcadores más repetidos</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${tops.slice(0,6).map(s=>`<div style="background:rgba(24,27,33,.6);border:1px solid var(--line);border-radius:10px;padding:7px 11px;text-align:center;min-width:54px"><div style="font-weight:800;font-size:15px">${s.i}-${s.j}</div><div style="font-size:11px;color:var(--mut)">${(s.c/n*100).toFixed(2)}%</div></div>`).join('')}</div>
+    <div class="kvs" style="margin-top:10px">
+      <div class="kv"><div class="k">Goles promedio</div><div class="v">${(r.sgA/n).toFixed(2)} vs ${(r.sgB/n).toFixed(2)}</div></div>
+      <div class="kv"><div class="k">Más de 2.5 goles</div><div class="v">${(r.over/n*100).toFixed(1)}%</div></div>
+      <div class="kv"><div class="k">Ambos marcan</div><div class="v">${(r.btts/n*100).toFixed(1)}%</div></div>
+      <div class="kv"><div class="k">Velocidad</div><div class="v">${(n/Math.max(1,r.ms)*1000/1000).toFixed(0)}k sims/s</div></div></div></div>`;
+  countUp('mcWn',pw*100,1,'%');countUp('mcDn',pd*100,1,'%');countUp('mcLn',pl*100,1,'%');}
+
+/* ---- comparación de TODOS los jugadores (radar agregado superpuesto) ---- */
+function teamAggAttrs(en){const ps=TEAMS[en].players;const acc=[0,0,0,0,0,0];let wsum=0;
+  ps.forEach(p=>{const at=playerAttrs(p),w=influence(p);wsum+=w;at.values.forEach((v,i)=>acc[i]+=v*w);});
+  return acc.map(v=>v/(wsum||1));}
+function posAvgInf(en,pos){const ps=TEAMS[en].players.filter(p=>posGroup(p.position)===pos);
+  return ps.length?ps.reduce((s,p)=>s+influence(p),0)/ps.length:0;}
+function topPlayers(en,k){return TEAMS[en].players.map((p,i)=>({p,i,v:influence(p)})).sort((x,y)=>y.v-x.v).slice(0,k);}
+function renderMatchComparison(a,b){
+  const host=$('#cmpOut');if(!host)return;
+  const A=TEAMS[a],B=TEAMS[b];
+  const agA=teamAggAttrs(a),agB=teamAggAttrs(b);
+  const labels=['Ataque','Definición','Creación','Físico','Experiencia','Disciplina'];
+  const posRows=['GK','DF','MF','FW'].map(pos=>{const va=posAvgInf(a,pos),vb=posAvgInf(b,pos);
+    return `<div class="posrow"><span style="color:var(--mut)">${pos}</span>
+      <div class="posbar"><i style="width:${va}%;background:linear-gradient(90deg,#0a6bff,#00e5ee)"></i></div>
+      <span style="text-align:center;font-weight:700">${Math.round(va)} · ${Math.round(vb)}</span>
+      <div class="posbar"><i style="width:${vb}%;background:linear-gradient(90deg,#ff8a5a,#ff6a5a);margin-left:auto"></i></div>
+      <span style="color:var(--mut);text-align:right">${pos}</span></div>`;}).join('');
+  const ta=topPlayers(a,5),tb=topPlayers(b,5);
+  const h2h=ta.map((oa,i)=>{const ob=tb[i];return `<div class="h2h">
+    <div><span class="plchip" draggable="true" ondragstart="plDragStart(event,'${a}',${oa.i})" ondragover="event.preventDefault()" ondrop="plDrop(event,'${a}',${oa.i})" onclick="openPlayer('${a}',${oa.i})">${A.flag} ${oa.p.name}</span>
+      <div class="ib"><i style="width:${oa.v}%;background:linear-gradient(90deg,#0a6bff,#00e5ee)"></i></div></div>
+    <div style="text-align:center;color:var(--mut2);font-size:11px;padding-top:6px">${oa.v} · ${ob?ob.v:'—'}</div>
+    <div style="text-align:right">${ob?`<span class="plchip" draggable="true" ondragstart="plDragStart(event,'${b}',${ob.i})" ondragover="event.preventDefault()" ondrop="plDrop(event,'${b}',${ob.i})" onclick="openPlayer('${b}',${ob.i})">${B.flag} ${ob.p.name}</span>
+      <div class="ib"><i style="width:${ob.v}%;background:linear-gradient(90deg,#ff8a5a,#ff6a5a);margin-left:auto"></i></div>`:''}</div></div>`;}).join('');
+  host.innerHTML=`<div style="border-top:1px dashed var(--line);padding-top:14px">
+    <h3 style="font-size:14px;margin-bottom:4px">⚔️ Comparación de todos los jugadores · ${A.es} vs ${B.es}</h3>
+    <p style="font-size:11.5px;color:var(--mut2);margin-bottom:8px">Radar agregado de los 26 jugadores de cada plantel (ponderado por influencia), superpuesto. 💡 Arrastra un nombre sobre otro para comparar dos jugadores en detalle.</p>
+    ${radarSVG(labels,[{values:agA,color:'#00e5ee'},{values:agB,color:'#ff6a5a'}],300)}
+    <div style="text-align:center;font-size:11.5px;color:var(--mut);margin:2px 0 12px"><span style="color:#00e5ee">●</span> ${A.flag} ${A.es} &nbsp;&nbsp; <span style="color:#ff6a5a">●</span> ${B.flag} ${B.es}</div>
+    <h3 style="font-size:13px;margin:10px 0 4px">📊 Influencia media por línea</h3>${posRows}
+    <h3 style="font-size:13px;margin:14px 0 4px">🌟 Top 5 figuras frente a frente</h3>${h2h}</div>`;}
+
+/* ---- drag & drop: selecciones y jugadores ---- */
+let DRAGPL=null,POOLSIDE='B';
+function teamDragStart(ev,en){try{ev.dataTransfer.setData('text/plain','team:'+en);}catch(e){}window.__dragTeam=en;}
+function slotDragOver(ev){ev.preventDefault();ev.currentTarget.classList.add('over');}
+function slotDragLeave(ev){ev.currentTarget.classList.remove('over');}
+function slotDrop(ev,side){ev.preventDefault();ev.currentTarget.classList.remove('over');
+  let en=window.__dragTeam;try{const d=ev.dataTransfer.getData('text/plain');if(d&&d.indexOf('team:')===0)en=d.slice(5);}catch(e){}
+  if(!en||!TEAMS[en])return;$(side==='A'?'#simA':'#simB').value=en;syncF();runSim();}
+function plDragStart(ev,en,idx){DRAGPL={en,idx};try{ev.dataTransfer.setData('text/plain','pl:'+en+'|'+idx);}catch(e){}}
+function plDrop(ev,en,idx){ev.preventDefault();const d=DRAGPL;if(!d||(d.en===en&&d.idx===idx))return;
+  CMP={en:d.en,idx:d.idx};openPlayer(en,idx);DRAGPL=null;}
+function renderTeamPool(){const tp=$('#teamPool');if(!tp)return;
+  tp.innerHTML=ENS.slice().sort((x,y)=>TEAMS[x].es.localeCompare(TEAMS[y].es)).map(en=>
+    `<span class="tpchip" draggable="true" ondragstart="teamDragStart(event,'${en}')" onclick="poolClick('${en}')">${TEAMS[en].flag} ${TEAMS[en].es}</span>`).join('');}
+function poolClick(en){POOLSIDE=POOLSIDE==='A'?'B':'A';$(POOLSIDE==='A'?'#simA':'#simB').value=en;syncF();runSim();}
+
 /* ===== INIT ===== */
 renderDash();renderMatches();renderGroups();renderTeamGrid('');syncF();runSim();renderPredModel();renderRefs();renderHistorias();
 ENS.slice().sort((a,b)=>TEAMS[a].es.localeCompare(TEAMS[b].es)).forEach(en=>{const o=document.createElement('option');o.value=en;o.textContent=TEAMS[en].flag+' '+TEAMS[en].es;$('#vizRadarSel').appendChild(o);});
 $('#vizRadarSel').value='Spain';$('#vizRadarSel').addEventListener('change',renderTeamRadar);
 $('#newBracket').addEventListener('click',newBracket);
+$('#mcBtn').addEventListener('click',runMatchMC);
+renderTeamPool();
 renderTeamRadar();renderBracket();renderTreemap();renderWorldMap();
 setTimeout(()=>{runGroupSim(2000);renderGroups();},60);
 </script>
